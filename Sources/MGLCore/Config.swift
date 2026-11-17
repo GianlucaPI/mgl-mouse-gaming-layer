@@ -183,10 +183,14 @@ public struct MGLConfig: Codable, Equatable {
         func path(_ c: DecodingError.Context) -> String {
             c.codingPath.map { $0.intValue.map { "[\($0)]" } ?? ".\($0.stringValue)" }.joined()
         }
+        func at(_ c: DecodingError.Context) -> String {
+            let p = path(c)
+            return p.isEmpty ? "" : p + ": "
+        }
         switch error {
-        case .dataCorrupted(let c): return "\(path(c)): \(c.debugDescription)"
-        case .keyNotFound(let key, let c): return "\(path(c)): missing key \"\(key.stringValue)\""
-        case .typeMismatch(_, let c), .valueNotFound(_, let c): return "\(path(c)): \(c.debugDescription)"
+        case .dataCorrupted(let c): return "\(at(c))\(c.debugDescription)"
+        case .keyNotFound(let key, let c): return "\(at(c))missing key \"\(key.stringValue)\""
+        case .typeMismatch(_, let c), .valueNotFound(_, let c): return "\(at(c))\(c.debugDescription)"
         @unknown default: return "\(error)"
         }
     }

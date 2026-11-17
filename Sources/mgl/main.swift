@@ -30,7 +30,7 @@ RUN OPTIONS
   -v, --verbose      Log every patched / synced event.
   -h, --help         Show this help.
 
-While running: send SIGHUP (`pkill -HUP mgl`) to reload the config.
+While running, the config file is watched and reloaded on save (or send SIGHUP).
 Requires Accessibility permission for the app that runs it (Terminal, …).
 """
 
@@ -85,12 +85,9 @@ while i < argv.count {
 
 // MARK: - Config loading
 
-/// Returns the config and whether it came from a file.
 func loadConfig() throws -> (MGLConfig, fromFile: Bool) {
-    guard FileManager.default.fileExists(atPath: configURL.path) else {
-        return (MGLConfig.builtInDefault, false)
-    }
-    return (try MGLConfig.load(from: configURL), true)
+    let loaded = try MGLEngine.loadConfig(at: configURL)
+    return (loaded.config, loaded.fromFile)
 }
 
 // MARK: - config subcommands
@@ -138,17 +135,15 @@ if !dryRun && !Permissions.accessibilityGranted {
     """, code: 1)
 }
 
-var config: MGLConfig
+// Validate up front: the CLI refuses to start with an invalid config.
 do {
-    let (loaded, fromFile) = try loadConfig()
-    config = loaded
+    let (config, fromFile) = try loadConfig()
     print(fromFile ? "Config: \(configURL.path)"
                    : "Config: none at \(configURL.path) — built-in default (always active). `mgl config init` creates one.")
+    if let forcedProfile, config.profile(named: forcedProfile) == nil {
+        fail("No profile named \"\(forcedProfile)\"", code: 1)
+    }
 } catch { fail("\(error)", code: 1) }
-
-if let forcedProfile, config.profile(named: forcedProfile) == nil {
-    fail("No profile named \"\(forcedProfile)\"", code: 1)
-}
 
 func eventName(_ type: CGEventType) -> String {
     switch type {
@@ -165,7 +160,16 @@ func eventName(_ type: CGEventType) -> String {
     }
 }
 
-let patcher = ModifierPatcher(settings: nil, dryRun: dryRun) { activity in
+func describe(_ s: PatchSettings) -> String {
+    let mods = ModifierName.allCases.filter { s.modifierMask & $0.mask != 0 }.map(\.rawValue).joined(separator: ",")
+    var parts = ["modifiers=\(mods)"]
+    if let k = s.keyboardTypes { parts.append("kbType=\(k.sorted().map(String.init).joined(separator: ","))") }
+    parts.append(s.patchMouse ? "mouse=on" : "mouse=off")
+    if s.syncGlobal { parts.append("sync-global") }
+    return parts.joined(separator: " ")
+}
+
+let engine = MGLEngine(configURL: configURL, dryRun: dryRun, overrides: overrides) { activity in
     guard verbose || dryRun else { return }
     switch activity {
     case let .patched(type, keyCode, kbType, original, patched):
@@ -176,55 +180,38 @@ let patcher = ModifierPatcher(settings: nil, dryRun: dryRun) { activity in
         print("\(ProbeClock.stamp()) synced global state \(ModifierFlags.describe(flags)) via \(KeyNames.macKeyCode(keyCode))")
     }
 }
+engine.forcedProfile = forcedProfile
 
-func describe(_ s: PatchSettings) -> String {
-    let mods = ModifierName.allCases.filter { s.modifierMask & $0.mask != 0 }.map(\.rawValue).joined(separator: ",")
-    var parts = ["modifiers=\(mods)"]
-    if let k = s.keyboardTypes { parts.append("kbType=\(k.sorted().map(String.init).joined(separator: ","))") }
-    parts.append(s.patchMouse ? "mouse=on" : "mouse=off")
-    if s.syncGlobal { parts.append("sync-global") }
-    return parts.joined(separator: " ")
-}
-
-var currentApp = FrontmostAppMonitor.current
-
-/// Picks the profile for the frontmost app and applies it, logging only on changes.
-func applyProfile(reason: String) {
-    let profile = forcedProfile.flatMap(config.profile(named:))
-        ?? config.resolve(bundleID: currentApp.bundleID, appName: currentApp.name)
-    let settings = profile.map { PatchSettings(profile: $0).applying(overrides) }
-    guard settings != patcher.settings || reason == "start" || reason == "reload" else { return }
-    patcher.settings = settings
-    if let settings {
-        print("\(ProbeClock.stamp()) ACTIVE   profile \"\(settings.profileName)\" [\(describe(settings))] — \(currentApp.label)")
-    } else {
-        print("\(ProbeClock.stamp()) inactive (no profile) — \(currentApp.label)")
-    }
-}
-
-do { try patcher.start() } catch { fail("\(error)", code: 1) }
-
-let appMonitor = FrontmostAppMonitor { app in
-    currentApp = app
-    applyProfile(reason: "app")
-}
-
-print("mgl \(MGL.version) running\(dryRun ? " (DRY RUN)" : "")\(forcedProfile.map { " — forced profile \"\($0)\"" } ?? ""). Ctrl-C to stop.")
-applyProfile(reason: "start")
-appMonitor.start()
-
-// SIGHUP: reload config. SIGINT/SIGTERM: stop with stats.
-signal(SIGHUP, SIG_IGN)
-let sighup = DispatchSource.makeSignalSource(signal: SIGHUP, queue: .main)
-sighup.setEventHandler {
-    do {
-        config = try loadConfig().0
-        print("\(ProbeClock.stamp()) config reloaded")
-        applyProfile(reason: "reload")
-    } catch {
+// Log ACTIVE/inactive only when the effective settings change (or after a reload).
+var lastLogged: PatchSettings??
+var forceNextLog = true
+engine.onEvent = { event in
+    switch event {
+    case .statusChanged(let status):
+        guard forceNextLog || lastLogged.map({ $0 != status.settings }) ?? true else { return }
+        forceNextLog = false
+        lastLogged = .some(status.settings)
+        if let settings = status.settings {
+            print("\(ProbeClock.stamp()) ACTIVE   profile \"\(settings.profileName)\" [\(describe(settings))] — \(status.app.label)")
+        } else {
+            print("\(ProbeClock.stamp()) inactive (no profile) — \(status.app.label)")
+        }
+    case .configReloaded:
+        if lastLogged != nil { print("\(ProbeClock.stamp()) config reloaded") }
+        forceNextLog = true
+    case .configReloadFailed(let error):
         print("\(ProbeClock.stamp()) reload FAILED, keeping previous config: \(error)")
     }
 }
+
+print("mgl \(MGL.version) running\(dryRun ? " (DRY RUN)" : "")\(forcedProfile.map { " — forced profile \"\($0)\"" } ?? ""). Ctrl-C to stop.")
+do { try engine.start() } catch { fail("\(error)", code: 1) }
+engine.watchConfigFile()
+
+// SIGHUP: reload config (the file is also watched). SIGINT/SIGTERM: stop with stats.
+signal(SIGHUP, SIG_IGN)
+let sighup = DispatchSource.makeSignalSource(signal: SIGHUP, queue: .main)
+sighup.setEventHandler { engine.reloadConfig() }
 sighup.resume()
 
 var stopSources: [DispatchSourceSignal] = []
@@ -232,10 +219,10 @@ for sig in [SIGINT, SIGTERM] {
     signal(sig, SIG_IGN)
     let src = DispatchSource.makeSignalSource(signal: sig, queue: .main)
     src.setEventHandler {
-        patcher.stop()
-        appMonitor.stop()
-        print("\nStopped. Patched keys: \(patcher.patchedKeyCount), mouse events: \(patcher.patchedMouseCount), "
-            + "global syncs: \(patcher.syncCount), tap restarts: \(patcher.tapRestarts)")
+        engine.stop()
+        let p = engine.patcher
+        print("\nStopped. Patched keys: \(p.patchedKeyCount), mouse events: \(p.patchedMouseCount), "
+            + "global syncs: \(p.syncCount), tap restarts: \(p.tapRestarts)")
         exit(0)
     }
     src.resume()

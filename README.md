@@ -2,7 +2,7 @@
 
 A lightweight macOS input layer that makes **keyboard modifiers (Shift, Option, Control, Command)** work together with the side buttons of gaming mice that emit keyboard keystrokes — built first and foremost for the **SteelSeries Aerox 9 (12 side buttons)** and **World of Warcraft** on Apple Silicon.
 
-> Status: **alpha — working in World of Warcraft; Phase 4 (config & per-app profiles) implemented**. See [docs/ROADMAP.md](docs/ROADMAP.md) and [DEV_LOG.txt](DEV_LOG.txt).
+> Status: **alpha — working in World of Warcraft; Phase 5 menu-bar app implemented**. See [docs/ROADMAP.md](docs/ROADMAP.md) and [DEV_LOG.txt](DEV_LOG.txt).
 
 ## The problem
 
@@ -24,7 +24,7 @@ Profiles in a JSON config decide **when** MGL is active (e.g. only while World o
 ## Requirements
 
 - macOS 13+ on Apple Silicon (developed on MacBook Pro M1 Pro)
-- Swift 5.9+ toolchain (Command Line Tools are enough for the CLI; full Xcode only needed later for the menu-bar app bundle)
+- Swift 5.9+ toolchain — Command Line Tools are enough for everything, including the app bundle (no Xcode needed)
 - Permissions: **Accessibility** and **Input Monitoring** (System Settings → Privacy & Security)
 
 ## Project layout
@@ -33,18 +33,38 @@ Profiles in a JSON config decide **when** MGL is active (e.g. only while World o
 MGL_mouse_gaming_layer/
 ├── Package.swift
 ├── Sources/
-│   ├── MGLCore/        # HID enumeration/monitoring, event tap, key & modifier tables
+│   ├── MGLCore/        # engine, event tap, config/profiles, HID tools, key & modifier tables
 │   ├── mgl-probe/      # diagnostic CLI: lists HID devices, logs raw events
-│   └── mgl/            # the layer (CLI; menu-bar app in Phase 5)
+│   ├── mgl/            # the layer as a CLI (debugging, verbose logs)
+│   └── MGLMenuBar/     # the menu-bar app (MGL.app)
 ├── Tests/MGLCoreTests/
 ├── config/example.json
-├── scripts/test.sh
+├── scripts/            # test.sh, build-app.sh, create-signing-identity.sh
 ├── docs/ROADMAP.md
 ├── DEV_LOG.txt
 └── README.md
 ```
 
-## Build & run
+## Menu-bar app (recommended)
+
+```bash
+./scripts/create-signing-identity.sh   # once: local self-signed code-signing certificate
+./scripts/build-app.sh --install       # build MGL.app, sign it, copy to /Applications, launch
+```
+
+Then grant **Accessibility** to **MGL** (System Settings → Privacy & Security → Accessibility; the app prompts and waits). A mouse icon appears in the menu bar:
+
+| Icon | Meaning |
+|---|---|
+| filled mouse | active (a profile matches the frontmost app) |
+| outlined mouse | inactive in this app, or paused |
+| warning triangle | missing permission or config error (details in the menu) |
+
+Menu: current state · **Enabled** (pause/resume) · **Profile** (Automatic by frontmost app, or force one) · **Edit Config…** (creates it from the example if missing) · Show Config in Finder · Reload Config · **Launch at Login** · Open Accessibility Settings · Quit. The config file is watched and reloaded on save; an invalid file keeps the previous config and shows the error in the menu.
+
+**Why the signing identity:** macOS remembers the Accessibility permission per code signature. Ad-hoc signatures change on every build (the permission would have to be granted again); the local certificate gives a stable signature (`identifier "local.mgl.MouseGamingLayer" and certificate leaf = …`). The certificate lives only in your login keychain and can be deleted with Keychain Access. `MGL_SIGN_IDENTITY=<name>` uses another identity (e.g. an Apple Development certificate).
+
+## Build & run (CLI)
 
 ```bash
 swift build -c release
@@ -90,7 +110,7 @@ swift build -c release
 
 **Resolution:** the first enabled profile whose `apps` contains the frontmost app wins; otherwise the first enabled catch-all profile; otherwise mgl is inactive (events pass through untouched). MGL switches profile instantly when you change app. Use `mgl-probe apps` to discover an app's name and bundle ID.
 
-Config commands: `mgl config init [--force]`, `mgl config path`, `mgl config show`, `mgl config check`. Reload a running mgl with `pkill -HUP mgl`.
+Config commands: `mgl config init [--force]`, `mgl config path`, `mgl config show`, `mgl config check`. Both the app and the CLI reload the file automatically when it is saved (CLI: also `pkill -HUP mgl`). If the file is deleted, the built-in default (always active) applies again.
 
 `mgl` run options (they override every profile):
 

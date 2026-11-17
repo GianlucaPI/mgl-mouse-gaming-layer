@@ -6,3 +6,4 @@ DerivedData/
 *.app
 *.dSYM
 *.log
+build/

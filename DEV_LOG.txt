@@ -186,3 +186,50 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     keep working (bundle ID match).
   - Phase 4 complete (per-button remap and VID/PID match deferred).
   - NEXT: Phase 5 (menu-bar app, launch at login, stable code signature).
+
+[2026-11-17] Phase 5 - Menu-bar app, launch at login, stable signing
+  - Started from a clean tree (last commit 3da8938).
+  - MGLCore/Engine.swift (MGLEngine): shared by CLI and app. Owns config
+    load/reload (invalid -> keep previous + configError), frontmost app ->
+    profile resolution, `enabled` (pause), `forcedProfile`, CLI overrides,
+    the ModifierPatcher and FrontmostAppMonitor. Emits statusChanged /
+    configReloaded / configReloadFailed events.
+  - Config file watching: DispatchSource on the directory (editors replace
+    the file) + on the file (in-place writes), re-armed after each change,
+    0.3 s debounce, skipped when content is unchanged. Tested: sed -i edit,
+    corrupt JSON (kept previous, error shown), re-create, delete (-> built-in
+    default, always active).
+  - mgl CLI refactored onto MGLEngine (same output as before); still refuses
+    to START with an invalid config.
+  - Config errors: no leading ": " when the error has no key path.
+  - Sources/MGLMenuBar (product MGLMenuBar, executable "MGL" in the bundle):
+    NSStatusItem with SF Symbols (computermouse.fill = active, computermouse
+    = inactive/paused, exclamationmark.triangle = permission/config error).
+    Menu: state, Enabled, Profile (Automatic / forced), Edit Config (creates
+    the example if missing), Show in Finder, Reload, Launch at Login
+    (SMAppService.mainApp; .requiresApproval opens Login Items settings),
+    Open Accessibility Settings, Quit. Enabled + forced profile persisted in
+    UserDefaults. Without Accessibility it prompts once and polls every 2 s,
+    starting the tap as soon as permission is granted.
+    Swift 5 mode + @MainActor AppDelegate: top-level code and engine
+    callbacks wrapped in MainActor.assumeIsolated.
+  - scripts/build-app.sh: release build -> build/MGL.app (Info.plist:
+    local.mgl.MouseGamingLayer, LSUIElement, version from MGL.version,
+    build number = commit count) -> codesign -> verify; --install copies to
+    /Applications (or ~/Applications), quitting a running MGL first, and opens it.
+    Identity: $MGL_SIGN_IDENTITY > "MGL Local Code Signing" > ad-hoc (warns).
+  - scripts/create-signing-identity.sh: self-signed RSA-2048 code-signing
+    cert (10 y) via LibreSSL -> PKCS#12 -> `security import -T codesign`.
+    No codesigning identity existed on this Mac. Tested ONLY in a throwaway
+    keychain (deleted afterwards): the cert shows CSSMERR_TP_NOT_TRUSTED but
+    codesign works with it and the designated requirement becomes
+    `identifier "local.mgl.MouseGamingLayer" and certificate leaf = H"..."`
+    (stable) instead of `cdhash H"..."` (changes every build). The user runs
+    the script on the login keychain.
+  - Ad-hoc build of MGL.app verified (codesign --verify --strict OK). The app
+    was NOT launched here (it would trigger the Accessibility prompt).
+  - Tests: 26 passing.
+  - NEXT (user): create-signing-identity.sh, build-app.sh --install, grant
+    Accessibility to MGL, test WoW switching from the menu bar, rebuild once
+    to confirm the permission is kept, toggle Launch at Login. Quit any
+    running `mgl` CLI first (two layers would both patch, harmless but noisy).

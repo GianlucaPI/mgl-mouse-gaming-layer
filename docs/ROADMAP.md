@@ -57,11 +57,16 @@ Only if A is insufficient (e.g. WoW reads modifiers from a per-device state, or 
 - [ ] *Deferred:* per-button remap (side button → `F13`…`F24`). Changing only the keycode leaves the original character in the event, so text-reading apps would still see the old key; needs synthesizing a fresh key event. Not needed today (buttons are assigned in onboard memory and WoW binds them fine).
 - [ ] *Deferred:* device match by VID/PID in the config (needs HID↔event correlation; `keyboardTypes` covers it for now).
 
-## Phase 5 — Packaging & UX
-- [ ] Menu-bar app (status item: on/off, profile, open config, quit).
-- [ ] Launch at login (`SMAppService`).
-- [ ] `.app` bundle with stable code signature (so macOS remembers Accessibility/Input Monitoring permissions across rebuilds). Ad-hoc or Developer ID; notarization optional for personal use.
-- [ ] LaunchAgent alternative for a headless CLI setup.
+## Phase 5 — Packaging & UX 🚧
+- [x] Shared `MGLEngine` (config load/reload, profile resolution, pause, forced profile) used by both the CLI and the app.
+- [x] Config file watching (directory + file, debounced, invalid file keeps the previous config).
+- [x] Menu-bar app `MGLMenuBar` (AppKit, no Dock icon): state icon, Enabled, Profile (automatic/forced), Edit/Reveal/Reload config, Launch at Login, Accessibility shortcut, Quit. Preferences in UserDefaults. Waits for Accessibility and starts by itself once granted.
+- [x] Launch at login (`SMAppService.mainApp`).
+- [x] `scripts/build-app.sh`: SwiftPM release build → `MGL.app` (Info.plist with LSUIElement) → codesign → optional `--install`. No Xcode needed.
+- [x] `scripts/create-signing-identity.sh`: local self-signed code-signing identity → stable designated requirement, so Accessibility survives rebuilds (verified in a throwaway keychain).
+- [ ] Verify on hardware: install, grant Accessibility, WoW switching from the menu-bar app, permission kept after a rebuild, Launch at Login.
+- [ ] App icon (.icns) — cosmetic.
+- ~~LaunchAgent alternative for a headless CLI setup~~ — not needed: the app covers launch at login.
 
 ## Phase 6 — Hardening & release
 - [ ] Latency measurement (target: < 1 ms added per event).
