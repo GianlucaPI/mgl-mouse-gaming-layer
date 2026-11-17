@@ -1,0 +1,17 @@
+MGL - Mouse Gaming Layer - DEVELOPMENT LOG
+===========================================
+Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details.
+
+[2026-11-17] Phase 0 - Project bootstrap
+  - Created git repository (branch: main).
+  - Added README.md (English), docs/ROADMAP.md, DEV_LOG.txt, .gitignore.
+  - Environment: MacBook Pro M1 Pro, macOS 27.2, Swift 6.4.2 (Command Line Tools,
+    no full Xcode installed -> SwiftPM CLI is enough for Phases 1-4).
+  - Target hardware: SteelSeries Aerox 9 (12 side buttons), side buttons bound
+    to keyboard keys in onboard memory. Target game: World of Warcraft.
+  - Problem statement: holding Shift/Option on the keyboard + pressing a side
+    button yields the unmodified key. Working hypothesis: the mouse is a separate
+    HID keyboard and its key events carry its own (empty) modifier state.
+  - Chosen plan: diagnose first (mgl-probe), then MVP with a flag-patching
+    CGEventTap (Strategy A); fall back to IOHIDManager seize + re-emit (Strategy B).
+  - NEXT: SwiftPM skeleton + mgl-probe (HID enumeration, raw HID log, event-tap log).
