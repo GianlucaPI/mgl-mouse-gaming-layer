@@ -101,7 +101,8 @@ public struct MGLConfig: Codable, Equatable {
         Profile(
             name: "World of Warcraft",
             enabled: true,
-            apps: ["com.blizzard.worldofwarcraft", "World of Warcraft"],
+            // Bundle ID verified on macOS (2026-11-17); the app's display name is "Wow".
+            apps: ["com.blizzard.worldofwarcraft", "Wow", "World of Warcraft"],
             modifiers: ModifierName.allCases,
             patchMouse: true,
             syncGlobal: false

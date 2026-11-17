@@ -3,6 +3,7 @@
     {
       "apps" : [
         "com.blizzard.worldofwarcraft",
+        "Wow",
         "World of Warcraft"
       ],
       "enabled" : true,

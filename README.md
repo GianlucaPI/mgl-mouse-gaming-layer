@@ -68,7 +68,7 @@ swift build -c release
     {
       "name": "World of Warcraft",
       "enabled": true,
-      "apps": ["com.blizzard.worldofwarcraft", "World of Warcraft"],
+      "apps": ["com.blizzard.worldofwarcraft", "Wow", "World of Warcraft"],
       "modifiers": ["shift", "control", "option", "command"],
       "patchMouse": true,
       "syncGlobal": false

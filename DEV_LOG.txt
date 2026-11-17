@@ -175,3 +175,14 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
   - NEXT (user): `mgl config init`, `mgl-probe apps` to confirm WoW's bundle
     id, run `mgl -v` and switch WoW <-> other apps (expect ACTIVE/inactive).
     Then Phase 5 (menu-bar app, launch at login, signing).
+
+[2026-11-17] Phase 4 - Per-app activation VERIFIED by the user
+  - `mgl -v` with the config from `mgl config init`: starts "inactive" in
+    Terminal; switches to ACTIVE profile "World of Warcraft" when WoW comes to
+    the front and back to inactive on leaving it (tested twice).
+  - WoW identifies as name "Wow", bundle ID com.blizzard.worldofwarcraft
+    (matched by bundle ID). Added "Wow" to the example profile's apps as a
+    name fallback; regenerated config/example.json. Existing user configs
+    keep working (bundle ID match).
+  - Phase 4 complete (per-button remap and VID/PID match deferred).
+  - NEXT: Phase 5 (menu-bar app, launch at login, stable code signature).
