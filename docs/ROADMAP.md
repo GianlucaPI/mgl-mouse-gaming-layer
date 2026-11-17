@@ -11,25 +11,27 @@ Stack: **Swift + SwiftPM** (no Xcode required until Phase 5), Apple frameworks o
 - [x] SwiftPM package skeleton (`MGLCore` library, `mgl-probe` and `mgl` executables, test target)
 - [ ] Decide license
 
-## Phase 1 — Diagnosis (`mgl-probe`) 🚧
-Confirm the exact root cause before writing the fix. Tooling is done; the in-game test session is pending.
+## Phase 1 — Diagnosis (`mgl-probe`) ✅
+Confirm the exact root cause before writing the fix.
 - [x] **HID enumeration**: list all HID devices with VendorID/ProductID/usage page. Identify the Aerox 9 (SteelSeries VID `0x1038`) interfaces: mouse, keyboard-like, vendor-specific. Note wired vs 2.4 GHz dongle vs Bluetooth (different PIDs).
 - [x] **Raw HID log**: with `IOHIDManager`, print the key usages the mouse emits for each of the 12 side buttons (and whether it sends a modifier byte = 0 on every report).
 - [x] **Event-tap log**: with a listen-only `CGEventTap`, print for every keyDown/keyUp/flagsChanged: keycode, `flags`, `kCGKeyboardEventKeyboardType`, source state ID, timestamp.
 - [x] Summary on exit (presses per device, keyboardType stats, count of keyDowns missing a held modifier)
-- [ ] Test matrix: hold Shift / Option / Ctrl on the keyboard + press side buttons → record what arrives. Also test in TextEdit and in WoW.
-- [ ] Write findings in DEV_LOG.txt → choose strategy A or B below.
+- [x] Test matrix (Shift + side buttons, Terminal): mouse keys arrive with no modifier flags; global HID/session state also reads empty. Mouse keyboardType = 40, MacBook keyboard = 92.
+- [x] Findings in DEV_LOG.txt → Strategy A with MGL's own modifier tracking.
 
 **Exit criterion:** we know which device/events carry the button presses and why modifiers are lost.
 
-## Phase 2 — Core fix, Strategy A: flag-patching event tap (MVP)
+## Phase 2 — Core fix, Strategy A: flag-patching event tap (MVP) 🚧
 The simplest approach; try first.
-- [ ] Active `CGEventTap` at `kCGHIDEventTap` (or `kCGSessionEventTap`) for keyDown/keyUp/flagsChanged.
-- [ ] Maintain our own modifier state from `flagsChanged` events of the real keyboard (left/right Shift, Option, Ctrl, Cmd).
-- [ ] On keyDown/keyUp whose flags lack held modifiers → OR them into `event.flags` and pass the event on.
-- [ ] Handle tap timeouts (`kCGEventTapDisabledByTimeout`) by re-enabling the tap.
-- [ ] Permission check & friendly prompt (`AXIsProcessTrustedWithOptions`, `IOHIDRequestAccess`).
+- [x] Active `CGEventTap` at `kCGHIDEventTap` for keyDown/keyUp/flagsChanged (`ModifierPatcher`).
+- [x] Own modifier state per keyboardType from `flagsChanged` events, incl. left/right bits (`ModifierTracker`).
+- [x] On keyDown/keyUp whose flags lack held modifiers → OR them into `event.flags` and pass the event on.
+- [x] Tap timeouts: re-enable the tap and reset tracked state (avoid stuck modifiers).
+- [x] Permission check & prompt (`AXIsProcessTrustedWithOptions`); `--dry-run`, `--kbtype`, `--verbose`.
+- [ ] Verify outside games: `mgl` running + `mgl-probe watch --session` shows patched flags; Shift+side button types uppercase in TextEdit.
 - [ ] Verify in WoW: `Shift+side button` triggers the Shift keybind.
+- [ ] If WoW ignores event flags (reads global state): add a "sync" mode that also restores the global modifier state.
 
 **Exit criterion:** Shift (and ideally Option/Ctrl) work with all 12 buttons in WoW.
 

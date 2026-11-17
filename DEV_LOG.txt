@@ -49,3 +49,43 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     Terminal, then `mgl-probe watch` without filter for Shift on the keyboard
     + side buttons, also inside WoW), shares probe.log -> decide Phase 2 design.
     Also worth comparing BLE vs 2.4 GHz dongle.
+
+[2026-11-17] Phase 1 - First real test session (BLE, Terminal, outside WoW)
+  - Input Monitoring granted to Terminal; Accessibility not yet.
+  - Mouse side buttons emit HID keyboard usages (seen: Y, U, I, P) on the same
+    BLE interface; each report also re-sends Consumer AC Pan (0x0C/0x238) = 0.
+  - ROOT CAUSE CONFIRMED: Left Shift held from t=1855ms to t=9595ms, yet the
+    mouse keyDown/keyUp events for Y/U/I/P carry flags=0x100 (no Shift).
+  - Worse: CGEventSourceFlagsState(.hidSystemState) and (.combinedSessionState)
+    also read [] at the time of the mouse events while Shift is still held.
+    => macOS global modifier state is not reliable here; the HID system appears
+       to adopt the (empty) modifier state of the mouse's keyboard collection.
+    => The probe's "MISSING" detector (based on hidSystemState) never fired:
+       it must track modifiers itself from flagsChanged events.
+  - keyboardType distinguishes devices: Aerox 9 = 40, MacBook keyboard = 92.
+  - Real keyboard events are fine (Ctrl+C carried Ctrl).
+  - DECISION: Phase 2 = Strategy A with our own modifier tracking:
+      * track per-keyboardType modifier state from flagsChanged events
+        (the mouse never emits flagsChanged);
+      * OR the union of held modifiers into every keyDown/keyUp (no-op for
+        events that already carry them).
+    Open question: does WoW read event flags or the global state? If the
+    latter, add an optional "sync" mode that also restores the global state.
+
+[2026-11-17] Phase 2 - MVP layer `mgl` (Strategy A)
+  - MGLCore/ModifierTracker.swift: per-keyboardType modifier state from
+    flagsChanged (Shift/Ctrl/Opt/Cmd + left/right device bits; CapsLock/Fn
+    ignored). held = union of all keyboards; patched(flags) = flags | held.
+  - MGLCore/ModifierPatcher.swift: active CGEventTap (HID level, head insert).
+    flagsChanged -> update tracker; keyDown/keyUp -> OR held modifiers into
+    event.flags if missing. On tap timeout: re-enable + reset tracker.
+  - mgl CLI: --kbtype <n> (restrict to e.g. 40 = Aerox 9 BLE), --dry-run
+    (listen-only, logs WOULD PATCH), -v. Needs Accessibility unless --dry-run.
+  - mgl-probe: MISSING detection now uses ModifierTracker (not hidSystemState),
+    new "held=" column; Consumer AC Pan = 0 noise hidden unless --raw.
+  - Tests: 12 passing (5 new for ModifierTracker).
+  - Smoke test: `mgl --dry-run` starts/stops cleanly. NOT yet tested with real
+    button presses or in WoW.
+  - NEXT (user): grant Accessibility to Terminal; run `mgl -v`, hold Shift +
+    side button in TextEdit (expect uppercase), then in WoW with a Shift
+    keybind. If WoW still sees no Shift -> implement global-state sync mode.

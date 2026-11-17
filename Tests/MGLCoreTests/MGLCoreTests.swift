@@ -45,6 +45,52 @@ import Testing
     }
 }
 
+@Suite struct ModifierTrackerTests {
+    let shiftL = CGEventFlags(rawValue: CGEventFlags.maskShift.rawValue | ModifierFlags.leftShift)
+    let nonCoalesced = CGEventFlags(rawValue: 0x100)
+
+    @Test func patchesMouseKeyWhileShiftHeld() {
+        var t = ModifierTracker()
+        t.observeFlagsChanged(keyboardType: 92, flags: CGEventFlags(rawValue: shiftL.rawValue | 0x100))
+        let patched = t.patched(nonCoalesced)
+        #expect(patched.contains(.maskShift))
+        #expect(patched.rawValue & ModifierFlags.leftShift != 0)
+        #expect(patched.rawValue & 0x100 != 0)  // other bits kept
+    }
+
+    @Test func releaseClearsState() {
+        var t = ModifierTracker()
+        t.observeFlagsChanged(keyboardType: 92, flags: shiftL)
+        t.observeFlagsChanged(keyboardType: 92, flags: nonCoalesced)
+        #expect(t.held.isEmpty)
+        #expect(t.patched(nonCoalesced) == nonCoalesced)
+    }
+
+    @Test func unionAcrossKeyboards() {
+        var t = ModifierTracker()
+        t.observeFlagsChanged(keyboardType: 92, flags: shiftL)
+        t.observeFlagsChanged(keyboardType: 40, flags: .maskAlternate)
+        #expect(t.held.contains(.maskShift))
+        #expect(t.held.contains(.maskAlternate))
+        t.observeFlagsChanged(keyboardType: 92, flags: [])
+        #expect(!t.held.contains(.maskShift))
+        #expect(t.held.contains(.maskAlternate))
+    }
+
+    @Test func ignoresCapsLockAndFn() {
+        var t = ModifierTracker()
+        t.observeFlagsChanged(keyboardType: 92, flags: [.maskAlphaShift, .maskSecondaryFn])
+        #expect(t.held.isEmpty)
+    }
+
+    @Test func resetDropsEverything() {
+        var t = ModifierTracker()
+        t.observeFlagsChanged(keyboardType: 92, flags: shiftL)
+        t.reset()
+        #expect(t.held.isEmpty)
+    }
+}
+
 @Suite struct ParsingTests {
     @Test func hexParsing() {
         #expect(parseHexInt("0x1038") == 0x1038)

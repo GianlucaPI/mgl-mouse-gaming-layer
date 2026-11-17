@@ -93,6 +93,8 @@ func logHID(_ e: HIDInputEvent) {
     switch e.usagePage {
     case 0x07:
         if !raw && !KeyNames.isRealKeyboardUsage(e.usage) { return }
+    case 0x0C where e.usage == 0x238 && e.value == 0 && !raw:
+        return  // AC Pan = 0, re-sent by the Aerox 9 in every report
     case 0x09, 0x0C:
         break
     default:
@@ -110,8 +112,13 @@ func logHID(_ e: HIDInputEvent) {
     }
 }
 
+// Own modifier tracking: macOS's global state is reset by the mouse's key reports,
+// so it cannot be used to detect missing modifiers (DEV_LOG 2026-11-17).
+var tracker = ModifierTracker()
+
 func logTap(_ e: TapKeyEvent) {
-    let held = e.hidSystemFlags.intersection(ModifierFlags.relevantMask)
+    if e.type == .flagsChanged { tracker.observeFlagsChanged(keyboardType: e.keyboardType, flags: e.flags) }
+    let held = tracker.held.intersection(ModifierFlags.relevantMask)
     let carried = e.flags.intersection(ModifierFlags.relevantMask)
     let missing = held.subtracting(carried)
     let warn = (e.type != .flagsChanged && !missing.isEmpty)
@@ -122,7 +129,8 @@ func logTap(_ e: TapKeyEvent) {
         + "(\(KeyNames.macKeyCode(e.keyCode)))".padding(toLength: 14, withPad: " ", startingAt: 0)
         + "flags=\(ModifierFlags.describeHex(e.flags))  kbType=\(e.keyboardType) "
         + "srcState=\(e.sourceStateID) pid=\(e.sourcePID)\(e.isAutorepeat ? " REPEAT" : "")  "
-        + "hidState=\(ModifierFlags.describe(e.hidSystemFlags)) session=\(ModifierFlags.describe(e.sessionFlags))"
+        + "held=\(ModifierFlags.describe(tracker.held)) hidState=\(ModifierFlags.describe(e.hidSystemFlags)) "
+        + "session=\(ModifierFlags.describe(e.sessionFlags))"
         + warn)
 
     if e.type == .keyDown {
