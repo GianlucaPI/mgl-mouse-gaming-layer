@@ -18,7 +18,8 @@ public enum ProbeClock {
 
     /// Milliseconds elapsed since the process started using the clock.
     public static func elapsedMs() -> Double {
-        Double(DispatchTime.now().uptimeNanoseconds &- start) / 1_000_000
+        let origin = start  // force lazy init *before* reading "now", or the result underflows
+        return Double(DispatchTime.now().uptimeNanoseconds - origin) / 1_000_000
     }
 
     public static func stamp() -> String {

@@ -1,0 +1,36 @@
+{
+  "profiles" : [
+    {
+      "apps" : [
+        "com.blizzard.worldofwarcraft",
+        "World of Warcraft"
+      ],
+      "enabled" : true,
+      "modifiers" : [
+        "shift",
+        "control",
+        "option",
+        "command"
+      ],
+      "name" : "World of Warcraft",
+      "patchMouse" : true,
+      "syncGlobal" : false
+    },
+    {
+      "apps" : [
+
+      ],
+      "enabled" : false,
+      "modifiers" : [
+        "shift",
+        "control",
+        "option",
+        "command"
+      ],
+      "name" : "Everywhere else",
+      "patchMouse" : true,
+      "syncGlobal" : false
+    }
+  ],
+  "version" : 1
+}

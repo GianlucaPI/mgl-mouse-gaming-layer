@@ -17,6 +17,7 @@ USAGE
 COMMANDS
   list      List HID devices (no permission needed)
   perms     Show (and request) Input Monitoring / Accessibility permissions
+  apps      Log the frontmost app (name + bundle id) on every switch, for config "apps"
   hid       Log raw HID input values (keyboard, button, consumer pages)
   tap       Log key events and mouse clicks from a listen-only CGEventTap
   watch     hid + tap interleaved on one timeline (default)
@@ -209,6 +210,13 @@ var sigintSource: DispatchSourceSignal?
 switch command {
 case "list":
     runList()
+case "apps":
+    let monitor = FrontmostAppMonitor { app in
+        print("\(ProbeClock.stamp()) frontmost: \(app.name ?? "?")  bundleID=\(app.bundleID ?? "-")  pid=\(app.pid)")
+    }
+    monitor.start()
+    print("Switch between apps (e.g. WoW). Ctrl-C to stop.")
+    CFRunLoopRun()
 case "perms":
     runPerms()
 case "hid", "tap", "watch":

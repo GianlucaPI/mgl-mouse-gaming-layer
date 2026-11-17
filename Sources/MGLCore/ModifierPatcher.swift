@@ -4,48 +4,32 @@ import Foundation
 /// The MGL layer (Strategy A): an active CGEventTap that adds the modifiers held on the
 /// real keyboard to events that arrive without them (e.g. the mouse's side-button keys).
 /// Requires Accessibility permission.
+///
+/// Behavior is driven by `settings`, which can change at runtime (profile switch);
+/// `nil` means inactive: events pass through untouched, but modifier tracking continues
+/// so the state is correct the moment a profile becomes active.
 public final class ModifierPatcher {
-    public struct Options {
-        /// Only patch key events whose keyboardType is in this set (nil = all).
-        public var keyboardTypes: Set<Int>?
-        /// Listen-only: compute and report patches without modifying or posting events.
-        public var dryRun: Bool
-        /// Also patch mouse button and scroll events. After a side-button key, macOS's
-        /// global modifier state reads empty, so a following Shift-click may lose Shift.
-        public var patchMouse: Bool
-        /// After patching a key event, post a synthetic flagsChanged so that macOS's
-        /// *global* modifier state (NSEvent.modifierFlags, CGEventSourceFlagsState)
-        /// matches the modifiers actually held. Opt-in: synthetic modifier events can
-        /// trigger "press modifier twice" shortcuts.
-        public var syncGlobal: Bool
-
-        public init(keyboardTypes: Set<Int>? = nil, dryRun: Bool = false,
-                    patchMouse: Bool = true, syncGlobal: Bool = false) {
-            self.keyboardTypes = keyboardTypes
-            self.dryRun = dryRun
-            self.patchMouse = patchMouse
-            self.syncGlobal = syncGlobal
-        }
-    }
-
     public enum Activity {
         case patched(type: CGEventType, keyCode: Int, keyboardType: Int,
                      original: CGEventFlags, patched: CGEventFlags)
         case synced(flags: CGEventFlags, keyCode: Int)
     }
 
+    /// Active settings; nil = inactive (pass-through).
+    public var settings: PatchSettings?
+
     public private(set) var patchedKeyCount = 0
     public private(set) var patchedMouseCount = 0
     public private(set) var syncCount = 0
     public private(set) var tapRestarts = 0
 
-    private static let keyTypes: [CGEventType] = [.keyDown, .keyUp, .flagsChanged]
-    private static let mouseTypes: [CGEventType] = [
+    private static let types: [CGEventType] = [
+        .keyDown, .keyUp, .flagsChanged,
         .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp,
         .otherMouseDown, .otherMouseUp, .scrollWheel,
     ]
 
-    private let options: Options
+    private let dryRun: Bool
     private let onActivity: (Activity) -> Void
     private var tracker = ModifierTracker()
     private var tap: CFMachPort?
@@ -53,20 +37,22 @@ public final class ModifierPatcher {
     private var syncPending = false
     private lazy var syntheticSource = CGEventSource(stateID: .hidSystemState)
 
-    public init(options: Options = Options(), onActivity: @escaping (Activity) -> Void = { _ in }) {
-        self.options = options
+    /// - Parameter dryRun: listen-only; report patches without modifying or posting events.
+    public init(settings: PatchSettings?, dryRun: Bool = false,
+                onActivity: @escaping (Activity) -> Void = { _ in }) {
+        self.settings = settings
+        self.dryRun = dryRun
         self.onActivity = onActivity
     }
 
     public func start() throws {
-        let types = Self.keyTypes + (options.patchMouse ? Self.mouseTypes : [])
-        let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << $1.rawValue) }
+        let mask = Self.types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << $1.rawValue) }
         let context = Unmanaged.passUnretained(self).toOpaque()
 
         guard let tap = CGEvent.tapCreate(
             tap: .cghidEventTap,
             place: .headInsertEventTap,
-            options: options.dryRun ? .listenOnly : .defaultTap,
+            options: dryRun ? .listenOnly : .defaultTap,
             eventsOfInterest: mask,
             callback: { _, type, event, context in
                 if let context {
@@ -103,31 +89,38 @@ public final class ModifierPatcher {
         // Never track or patch our own synthetic events.
         if event.getIntegerValueField(.eventSourceUserData) == MGL.syntheticEventMarker { return }
 
-        switch type {
-        case .flagsChanged:
+        if type == .flagsChanged {
             let kbType = Int(event.getIntegerValueField(.keyboardEventKeyboardType))
             tracker.observeFlagsChanged(keyboardType: kbType, flags: event.flags)
+            return
+        }
+        guard let settings else { return }  // inactive: pass-through
 
+        switch type {
         case .keyDown, .keyUp:
             let kbType = Int(event.getIntegerValueField(.keyboardEventKeyboardType))
-            if let allowed = options.keyboardTypes, !allowed.contains(kbType) { return }
-            guard patch(event, type: type, keyCode: Int(event.getIntegerValueField(.keyboardEventKeycode)),
-                        keyboardType: kbType) else { return }
+            if let allowed = settings.keyboardTypes, !allowed.contains(kbType) { return }
+            let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+            guard patch(event, type: type, keyCode: keyCode, keyboardType: kbType, mask: settings.modifierMask)
+            else { return }
             patchedKeyCount += 1
             // A key without the held modifiers means the global state was just reset.
-            if options.syncGlobal && !options.dryRun { scheduleSync() }
+            if settings.syncGlobal && !dryRun { scheduleSync() }
 
-        default:  // mouse buttons and scroll (only subscribed when patchMouse is on)
-            if patch(event, type: type, keyCode: -1, keyboardType: -1) { patchedMouseCount += 1 }
+        default:  // mouse buttons and scroll
+            guard settings.patchMouse else { return }
+            if patch(event, type: type, keyCode: -1, keyboardType: -1, mask: settings.modifierMask) {
+                patchedMouseCount += 1
+            }
         }
     }
 
     /// ORs held modifiers into the event. Returns true if the flags were missing some.
-    private func patch(_ event: CGEvent, type: CGEventType, keyCode: Int, keyboardType: Int) -> Bool {
+    private func patch(_ event: CGEvent, type: CGEventType, keyCode: Int, keyboardType: Int, mask: UInt64) -> Bool {
         let original = event.flags
-        let patched = tracker.patched(original)
+        let patched = tracker.patched(original, mask: mask)
         guard patched != original else { return false }
-        if !options.dryRun { event.flags = patched }
+        if !dryRun { event.flags = patched }
         onActivity(.patched(type: type, keyCode: keyCode, keyboardType: keyboardType,
                             original: original, patched: patched))
         return true
@@ -148,7 +141,8 @@ public final class ModifierPatcher {
     }
 
     private func postSync() {
-        let held = tracker.held
+        guard let settings else { return }
+        let held = CGEventFlags(rawValue: tracker.held.rawValue & settings.modifierMask)
         guard let keyCode = ModifierFlags.representativeKeyCode(for: held),
               let event = CGEvent(keyboardEventSource: syntheticSource, virtualKey: keyCode, keyDown: true)
         else { return }

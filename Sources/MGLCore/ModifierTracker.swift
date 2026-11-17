@@ -36,9 +36,9 @@ public struct ModifierTracker {
         CGEventFlags(rawValue: perKeyboard.values.reduce(0, |))
     }
 
-    /// `flags` plus every held modifier (other bits untouched).
-    public func patched(_ flags: CGEventFlags) -> CGEventFlags {
-        CGEventFlags(rawValue: flags.rawValue | held.rawValue)
+    /// `flags` plus every held modifier allowed by `mask` (other bits untouched).
+    public func patched(_ flags: CGEventFlags, mask: UInt64 = ModifierTracker.mask) -> CGEventFlags {
+        CGEventFlags(rawValue: flags.rawValue | (held.rawValue & mask))
     }
 
     public mutating func reset() {

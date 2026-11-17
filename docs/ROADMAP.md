@@ -46,11 +46,16 @@ Only if A is insufficient (e.g. WoW reads modifiers from a per-device state, or 
 - [ ] Guarantee key-up delivery (no stuck keys) on sleep, device disconnect, app quit.
 - [ ] Hot-plug support (dongle reconnect, wired/wireless switch).
 
-## Phase 4 — Configuration & remapping
-- [ ] JSON config (`~/Library/Application Support/MGL/config.json`): device match (VID/PID), enabled modifiers, optional per-button remap (e.g. side button → `F13`…`F24`, numpad keys).
-- [ ] Per-app activation: active only while `World of Warcraft` is frontmost (`NSWorkspace.didActivateApplicationNotification`).
-- [ ] Profiles (e.g. "WoW", "Default").
-- [ ] Unit tests for modifier merging, keycode tables, config parsing.
+## Phase 4 — Configuration & remapping 🚧
+- [x] JSON config (`~/Library/Application Support/MGL/config.json`, `--config`): versioned, validated, readable errors; `mgl config init|path|show|check`.
+- [x] Per profile: enabled modifiers, keyboardTypes filter, mouse patching, global sync.
+- [x] Per-app activation: profile chosen from the frontmost app (bundle ID or name) via `NSWorkspace.didActivateApplicationNotification`; inactive = pass-through (modifier tracking continues).
+- [x] Profiles with priority (specific apps > catch-all), `--profile` to force one, SIGHUP reload.
+- [x] `mgl-probe apps` to discover bundle IDs.
+- [x] Unit tests for config parsing/validation, resolution, overrides, modifier masks (26 tests total).
+- [ ] Verify on hardware: WoW-only profile switches on/off when changing app; confirm WoW's bundle ID with `mgl-probe apps`.
+- [ ] *Deferred:* per-button remap (side button → `F13`…`F24`). Changing only the keycode leaves the original character in the event, so text-reading apps would still see the old key; needs synthesizing a fresh key event. Not needed today (buttons are assigned in onboard memory and WoW binds them fine).
+- [ ] *Deferred:* device match by VID/PID in the config (needs HID↔event correlation; `keyboardTypes` covers it for now).
 
 ## Phase 5 — Packaging & UX
 - [ ] Menu-bar app (status item: on/off, profile, open config, quit).
