@@ -29,6 +29,8 @@ OPTIONS
   --raw            hid/watch: also log non-key keyboard usages (rollover, 0x00-0x03)
   --session        tap/watch: tap at session level instead of HID level
                    (use it while mgl runs, to see events after mgl patched them)
+  --late           tap/watch: tap at the last stage before apps (annotated session):
+                   shows what apps really receive, e.g. Shift+wheel turned horizontal
 
 Press Ctrl-C to stop; a summary is printed on exit.
 Tip: pipe to a file with `| tee probe.log`.
@@ -57,6 +59,7 @@ while i < args.count {
     case "--all-pages": allPages = true
     case "--raw": raw = true
     case "--session": tapLocation = .cgSessionEventTap
+    case "--late": tapLocation = .cgAnnotatedSessionEventTap
     case "-h", "--help": print(usage); exit(0)
     default: fputs("Unknown option \(args[i])\n\n\(usage)\n", stderr); exit(2)
     }
@@ -213,7 +216,8 @@ func startTap() {
         fputs("Event tap: \(error)\n", stderr); exit(1)
     }
     tapMonitor = monitor
-    print("Event tap running at \(tapLocation == .cghidEventTap ? "HID" : "session") level.")
+    let level = tapLocation == .cghidEventTap ? "HID" : (tapLocation == .cgSessionEventTap ? "session" : "annotated-session (late)")
+    print("Event tap running at \(level) level.")
 }
 
 func installSigintSummary() {

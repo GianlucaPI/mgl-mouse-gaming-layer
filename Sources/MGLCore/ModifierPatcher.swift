@@ -13,7 +13,9 @@ public final class ModifierPatcher {
         case patched(type: CGEventType, keyCode: Int, keyboardType: Int,
                      original: CGEventFlags, patched: CGEventFlags)
         case synced(flags: CGEventFlags, keyCode: Int)
-        case shiftScrollFixed(before: ScrollAxes, after: ScrollAxes, original: CGEventFlags, patched: CGEventFlags)
+        /// stage: "hid" (first tap) or "late" (after macOS's Shift→horizontal conversion).
+        case shiftScrollFixed(stage: String, before: ScrollAxes, after: ScrollAxes,
+                              original: CGEventFlags, patched: CGEventFlags)
     }
 
     /// Active settings; nil = inactive (pass-through).
@@ -36,6 +38,11 @@ public final class ModifierPatcher {
     private var tracker = ModifierTracker()
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
+    /// Second tap, at the last stage before apps (annotated session), for scroll events only.
+    /// macOS converts Shift + wheel to horizontal *after* the HID tap, so the axis fix for
+    /// `vertical-keep-shift` has to happen here (DEV_LOG 2026-11-17).
+    private var lateTap: CFMachPort?
+    private var lateSource: CFRunLoopSource?
     private var syncPending = false
     private lazy var syntheticSource = CGEventSource(stateID: .hidSystemState)
 
@@ -70,13 +77,37 @@ public final class ModifierPatcher {
         CGEvent.tapEnable(tap: tap, enable: true)
         self.tap = tap
         self.source = source
+
+        guard let lateTap = CGEvent.tapCreate(
+            tap: .cgAnnotatedSessionEventTap,
+            place: .tailAppendEventTap,
+            options: dryRun ? .listenOnly : .defaultTap,
+            eventsOfInterest: CGEventMask(1) << CGEventType.scrollWheel.rawValue,
+            callback: { _, type, event, context in
+                if let context {
+                    Unmanaged<ModifierPatcher>.fromOpaque(context).takeUnretainedValue().handleLate(type, event)
+                }
+                return Unmanaged.passUnretained(event)
+            },
+            userInfo: context
+        ) else { stop(); throw MGLError.eventTapCreationFailed }
+
+        let lateSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, lateTap, 0)
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), lateSource, .commonModes)
+        CGEvent.tapEnable(tap: lateTap, enable: true)
+        self.lateTap = lateTap
+        self.lateSource = lateSource
     }
 
     public func stop() {
-        if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
-        if let source { CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes) }
+        for (t, s) in [(tap, source), (lateTap, lateSource)] {
+            if let t { CGEvent.tapEnable(tap: t, enable: false) }
+            if let s { CFRunLoopRemoveSource(CFRunLoopGetCurrent(), s, .commonModes) }
+        }
         tap = nil
         source = nil
+        lateTap = nil
+        lateSource = nil
     }
 
     /// Hot path: keep it fast (the tap is disabled by macOS if it is slow).
@@ -120,7 +151,8 @@ public final class ModifierPatcher {
                 event.flags = fixed.flags
             }
             scrollFixCount += 1
-            onActivity(.shiftScrollFixed(before: before, after: fixed.axes, original: original, patched: fixed.flags))
+            onActivity(.shiftScrollFixed(stage: "hid", before: before, after: fixed.axes,
+                                         original: original, patched: fixed.flags))
 
         default:  // mouse buttons and scroll
             guard settings.patchMouse else { return }
@@ -128,6 +160,32 @@ public final class ModifierPatcher {
                 patchedMouseCount += 1
             }
         }
+    }
+
+    /// Late stage: the event has been through macOS's Shift → horizontal conversion.
+    /// Move a horizontal-only wheel tick back to the vertical axis; Shift is kept for
+    /// `vertical-keep-shift` (and ensured present), dropped for `vertical`.
+    private func handleLate(_ type: CGEventType, _ event: CGEvent) {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            tapRestarts += 1
+            if let lateTap { CGEvent.tapEnable(tap: lateTap, enable: true) }
+            return
+        }
+        guard type == .scrollWheel, let settings, settings.shiftScroll != .system,
+              shiftScrollApplies(event, settings) else { return }
+        let before = ScrollAxes(event: event)
+        guard before.isHorizontalOnly else { return }
+        let original = event.flags
+        let withShift = CGEventFlags(rawValue: original.rawValue
+            | (tracker.held.rawValue & settings.modifierMask & ModifierName.shift.mask))
+        let fixed = ShiftScroll.fix(axes: before, flags: withShift, mode: settings.shiftScroll)
+        if !dryRun {
+            fixed.axes.write(to: event)
+            event.flags = fixed.flags
+        }
+        scrollFixCount += 1
+        onActivity(.shiftScrollFixed(stage: "late", before: before, after: fixed.axes,
+                                     original: original, patched: fixed.flags))
     }
 
     /// Shift is held (per our tracking or the event itself) and the event comes from a

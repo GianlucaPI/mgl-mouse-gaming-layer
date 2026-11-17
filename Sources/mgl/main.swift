@@ -179,8 +179,8 @@ let engine = MGLEngine(configURL: configURL, dryRun: dryRun, overrides: override
             + "\(ModifierFlags.describe(original)) -> \(ModifierFlags.describe(patched))")
     case let .synced(flags, keyCode):
         print("\(ProbeClock.stamp()) synced global state \(ModifierFlags.describe(flags)) via \(KeyNames.macKeyCode(keyCode))")
-    case let .shiftScrollFixed(before, after, original, patched):
-        print("\(ProbeClock.stamp()) \(dryRun ? "WOULD FIX" : "fixed") shift-scroll  \(before.summary) -> \(after.summary)  "
+    case let .shiftScrollFixed(stage, before, after, original, patched):
+        print("\(ProbeClock.stamp()) \(dryRun ? "WOULD FIX" : "fixed") shift-scroll [\(stage)]  \(before.summary) -> \(after.summary)  "
             + "\(ModifierFlags.describe(original)) -> \(ModifierFlags.describe(patched))")
     }
 }

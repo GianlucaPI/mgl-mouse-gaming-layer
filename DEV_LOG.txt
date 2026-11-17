@@ -304,3 +304,29 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
   - Tests: 35 passing.
   - NEXT (user): rebuild/reinstall, test Shift + wheel in WoW with
     vertical-keep-shift; probe output for wheel + middle click if it fails.
+
+[2026-11-17] Phase 5 - Shift + wheel: fix moved to a late tap
+  - User report: "vertical-keep-shift" does not work either. Shift + middle
+    click (wheel button) now WORKS in WoW.
+  - Reasoning from the two failures (no probe data yet):
+      * vertical: Shift stripped at the HID tap -> macOS did not convert, but
+        WoW (reads event flags) saw a plain wheel;
+      * vertical-keep-shift: at the HID tap the tick is STILL VERTICAL
+        (isHorizontalOnly == false) so nothing was moved; macOS converts it to
+        horizontal LATER in the pipeline -> WoW got Shift + horizontal.
+    => The Shift -> horizontal conversion happens after kCGHIDEventTap.
+  - Fix: ModifierPatcher creates a second active tap for scrollWheel only at
+    kCGAnnotatedSessionEventTap (tail append = last stage before apps). There,
+    a non-continuous, horizontal-only tick with Shift held is moved back to
+    axis 1 (same sign) and Shift is ensured in the flags (keep-shift) or
+    dropped (vertical). The HID-stage logic is unchanged. Activity/verbose
+    logs carry the stage ("hid" / "late"). Tap timeouts re-enable either tap.
+  - mgl-probe: new --late option (annotated-session tap) to see exactly what
+    apps receive.
+  - Tests: 35 passing; both taps create fine (dry run). NOT verified in WoW.
+  - Open risk: if the conversion instead happens inside AppKit (in the app),
+    no tap can see it; then the remaining option is a different modifier for
+    wheel binds. The probe with --late will show which case it is.
+  - NEXT (user): rebuild/reinstall, test Shift + wheel in WoW; if it fails,
+    `mgl-probe watch --late --steelseries` with MGL running (Shift + wheel
+    up/down) and share the output.

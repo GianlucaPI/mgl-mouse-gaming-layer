@@ -17,7 +17,8 @@ MGL sits between the hardware and the game:
 1. An active `CGEventTap` tracks, from `flagsChanged` events, which modifiers are held on each keyboard (MGL keeps its own state because the system one is unreliable here).
 2. Every keyDown/keyUp that arrives without those modifiers (e.g. from the mouse) gets them added to its flags. Mouse clicks and scroll events are patched the same way, because after a side-button press macOS's global modifier state reads empty and a following Shift-click would otherwise lose Shift.
 3. The game sees `Shift+1`, `Opt+1`, `Ctrl+1`, …
-4. Optionally (`--sync-global`), MGL also restores macOS's *global* modifier state with a synthetic modifier event, for apps/addons that query the current modifier state instead of reading it from the event.
+4. For Shift + mouse wheel (`shiftScroll`), a second tap at the last stage before apps moves wheel ticks that macOS turned horizontal back to the vertical axis.
+5. Optionally (`--sync-global`), MGL also restores macOS's *global* modifier state with a synthetic modifier event, for apps/addons that query the current modifier state instead of reading it from the event.
 
 Profiles in a JSON config decide **when** MGL is active (e.g. only while World of Warcraft is in the foreground) and **how** (which modifiers, mouse patching, global sync).
 
@@ -128,7 +129,7 @@ Config commands: `mgl config init [--force]`, `mgl config path`, `mgl config sho
 
 Verified so far (BLE): Shift + side button in TextEdit, World of Warcraft (keybinds and `[mod:shift]` macros) and macOS system apps; Shift-click right after a side button keeps Shift.
 
-`mgl-probe` commands: `list`, `perms`, `apps`, `hid`, `tap`, `watch` (default). Options: `--steelseries`, `--vendor <hex>`, `--all-pages`, `--raw`, `--session`. Run `mgl-probe help` for details.
+`mgl-probe` commands: `list`, `perms`, `apps`, `hid`, `tap`, `watch` (default). Options: `--steelseries`, `--vendor <hex>`, `--all-pages`, `--raw`, `--session`, `--late`. Run `mgl-probe help` for details.
 
 > Permissions are granted to the **terminal app** you run it from (Terminal, iTerm…): add it under System Settings → Privacy & Security → **Input Monitoring** (for `mgl-probe`) and **Accessibility** (for `mgl`), then restart the terminal.
 
