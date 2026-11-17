@@ -15,8 +15,9 @@ When you hold `Shift` on your real keyboard and press a side button, the game re
 MGL sits between the hardware and the game:
 
 1. An active `CGEventTap` tracks, from `flagsChanged` events, which modifiers are held on each keyboard (MGL keeps its own state because the system one is unreliable here).
-2. Every keyDown/keyUp that arrives without those modifiers (e.g. from the mouse) gets them added to its flags.
+2. Every keyDown/keyUp that arrives without those modifiers (e.g. from the mouse) gets them added to its flags. Mouse clicks and scroll events are patched the same way, because after a side-button press macOS's global modifier state reads empty and a following Shift-click would otherwise lose Shift.
 3. The game sees `Shift+1`, `Opt+1`, `Ctrl+1`, …
+4. Optionally (`--sync-global`), MGL also restores macOS's *global* modifier state with a synthetic modifier event, for apps/addons that query the current modifier state instead of reading it from the event.
 
 Optionally it can also remap the side buttons to arbitrary keys and only be active while World of Warcraft is in the foreground.
 
@@ -54,7 +55,17 @@ swift build -c release
 .build/release/mgl -v                               # run the layer (needs Accessibility)
 ```
 
-`mgl` options: `--kbtype <n>` (only patch events from that keyboardType; the Aerox 9 over BLE is `40`), `--dry-run`, `-v/--verbose`.
+`mgl` options:
+
+| Option | Effect |
+|---|---|
+| `--kbtype <n>` | Only patch key events from that keyboardType (Aerox 9 over BLE = `40`) |
+| `--no-mouse` | Don't patch mouse clicks / scroll (patched by default) |
+| `--sync-global` | Also restore macOS's global modifier state after a patched mouse key (opt-in, experimental: a synthetic modifier event may count towards "press Ctrl twice"-style shortcuts) |
+| `--dry-run` | Log what would be patched, change nothing |
+| `-v`, `--verbose` | Log every patched / synced event |
+
+Verified so far (BLE): Shift + side button in TextEdit, World of Warcraft and macOS system apps.
 
 `mgl-probe` commands: `list`, `perms`, `hid`, `tap`, `watch` (default). Options: `--steelseries`, `--vendor <hex>`, `--all-pages`, `--raw`, `--session`. Run `mgl-probe help` for details.
 

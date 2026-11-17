@@ -6,6 +6,10 @@ public enum MGL {
     /// SteelSeries vendor IDs: 0x1038 over USB / 2.4 GHz dongle,
     /// 0x0111 over Bluetooth LE (Bluetooth SIG-assigned company ID).
     public static let steelSeriesVendorIDs = [0x1038, 0x0111]
+
+    /// Stored in `eventSourceUserData` of every event MGL posts ("MGL" in ASCII),
+    /// so our own taps can recognize and ignore them.
+    public static let syntheticEventMarker: Int64 = 0x4D_47_4C
 }
 
 /// Monotonic clock shared by all monitors, so HID and event-tap logs can be interleaved.

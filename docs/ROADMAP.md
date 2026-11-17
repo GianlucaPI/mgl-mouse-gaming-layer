@@ -31,7 +31,9 @@ The simplest approach; try first.
 - [x] Permission check & prompt (`AXIsProcessTrustedWithOptions`); `--dry-run`, `--kbtype`, `--verbose`.
 - [x] Verify outside games: Shift+side button types uppercase in TextEdit and works in system apps.
 - [x] Verify in WoW: `Shift+side button` triggers the Shift keybind.
-- [ ] If WoW ignores event flags (reads global state): add a "sync" mode that also restores the global modifier state.
+- [x] Patch mouse clicks / scroll too (`--no-mouse` to disable): the global state is empty after a side-button press, so Shift-click could lose Shift.
+- [x] Opt-in `--sync-global`: after a patched mouse key, post a synthetic flagsChanged (tagged with `eventSourceUserData` = "MGL") to restore the global modifier state.
+- [ ] Verify Shift-click after a side-button press and `--sync-global` (probe `hidState`/`session` columns, WoW `[mod:shift]` macros).
 
 **Exit criterion:** Shift (and ideally Option/Ctrl) work with all 12 buttons in WoW.
 

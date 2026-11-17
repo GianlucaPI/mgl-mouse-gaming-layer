@@ -1,8 +1,9 @@
+import CoreGraphics
 import Foundation
 import MGLCore
 
 // mgl — the Mouse Gaming Layer (Phase 2, Strategy A).
-// Adds the modifiers held on the real keyboard to key events that arrive without them
+// Adds the modifiers held on the real keyboard to events that arrive without them
 // (e.g. the Aerox 9 side buttons).
 
 setvbuf(stdout, nil, _IOLBF, 0)
@@ -14,12 +15,15 @@ USAGE
   mgl [options]
 
 OPTIONS
-  --kbtype <n>   Only patch key events with this keyboardType (repeatable).
-                 Find it with `mgl-probe watch` (Aerox 9 over BLE = 40).
-                 Default: patch any key event missing a held modifier.
-  --dry-run      Listen-only: log what would be patched, change nothing.
-  -v, --verbose  Log every patched event.
-  -h, --help     Show this help.
+  --kbtype <n>     Only patch key events with this keyboardType (repeatable).
+                   Find it with `mgl-probe watch` (Aerox 9 over BLE = 40).
+                   Default: patch any key event missing a held modifier.
+  --no-mouse       Do not patch mouse button / scroll events (patched by default).
+  --sync-global    After patching a mouse key, also restore macOS's global modifier
+                   state with a synthetic flagsChanged event (opt-in, experimental).
+  --dry-run        Listen-only: log what would be patched, change nothing.
+  -v, --verbose    Log every patched / synced event.
+  -h, --help       Show this help.
 
 Requires Accessibility permission for the app that runs it (Terminal, …).
 Press Ctrl-C to stop.
@@ -38,6 +42,8 @@ while i < args.count {
             fputs("--kbtype needs an integer\n", stderr); exit(2)
         }
         options.keyboardTypes = (options.keyboardTypes ?? []).union([n])
+    case "--no-mouse": options.patchMouse = false
+    case "--sync-global": options.syncGlobal = true
     case "--dry-run": options.dryRun = true
     case "-v", "--verbose": verbose = true
     case "-h", "--help", "help": print(usage); exit(0)
@@ -57,12 +63,31 @@ if !options.dryRun && !Permissions.accessibilityGranted {
     exit(1)
 }
 
-let patcher = ModifierPatcher(options: options) { patch in
+func eventName(_ type: CGEventType) -> String {
+    switch type {
+    case .keyDown: return "keyDown"
+    case .keyUp: return "keyUp"
+    case .leftMouseDown: return "leftMouseDown"
+    case .leftMouseUp: return "leftMouseUp"
+    case .rightMouseDown: return "rightMouseDown"
+    case .rightMouseUp: return "rightMouseUp"
+    case .otherMouseDown: return "otherMouseDown"
+    case .otherMouseUp: return "otherMouseUp"
+    case .scrollWheel: return "scrollWheel"
+    default: return "type\(type.rawValue)"
+    }
+}
+
+let patcher = ModifierPatcher(options: options) { activity in
     guard verbose || options.dryRun else { return }
-    let kind = patch.type == .keyDown ? "keyDown" : "keyUp  "
-    print("\(ProbeClock.stamp()) \(options.dryRun ? "WOULD PATCH" : "patched") \(kind) "
-        + "\(KeyNames.macKeyCode(patch.keyCode)) kbType=\(patch.keyboardType)  "
-        + "\(ModifierFlags.describe(patch.original)) -> \(ModifierFlags.describe(patch.patched))")
+    switch activity {
+    case let .patched(type, keyCode, kbType, original, patched):
+        let what = keyCode >= 0 ? "\(eventName(type)) \(KeyNames.macKeyCode(keyCode)) kbType=\(kbType)" : eventName(type)
+        print("\(ProbeClock.stamp()) \(options.dryRun ? "WOULD PATCH" : "patched") \(what)  "
+            + "\(ModifierFlags.describe(original)) -> \(ModifierFlags.describe(patched))")
+    case let .synced(flags, keyCode):
+        print("\(ProbeClock.stamp()) synced global state \(ModifierFlags.describe(flags)) via \(KeyNames.macKeyCode(keyCode))")
+    }
 }
 
 do { try patcher.start() } catch {
@@ -73,11 +98,15 @@ signal(SIGINT, SIG_IGN)
 let sigint = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
 sigint.setEventHandler {
     patcher.stop()
-    print("\nStopped. Patched events: \(patcher.patchedCount), tap restarts: \(patcher.tapRestarts)")
+    print("\nStopped. Patched keys: \(patcher.patchedKeyCount), mouse events: \(patcher.patchedMouseCount), "
+        + "global syncs: \(patcher.syncCount), tap restarts: \(patcher.tapRestarts)")
     exit(0)
 }
 sigint.resume()
 
 let scope = options.keyboardTypes.map { "keyboardType " + $0.sorted().map(String.init).joined(separator: ",") } ?? "all keyboards"
-print("mgl \(MGL.version) running\(options.dryRun ? " (DRY RUN)" : "") — patching \(scope). Ctrl-C to stop.")
+var features = [scope]
+if options.patchMouse { features.append("mouse clicks/scroll") }
+if options.syncGlobal { features.append("global-state sync") }
+print("mgl \(MGL.version) running\(options.dryRun ? " (DRY RUN)" : "") — \(features.joined(separator: " + ")). Ctrl-C to stop.")
 CFRunLoopRun()

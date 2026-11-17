@@ -18,7 +18,7 @@ COMMANDS
   list      List HID devices (no permission needed)
   perms     Show (and request) Input Monitoring / Accessibility permissions
   hid       Log raw HID input values (keyboard, button, consumer pages)
-  tap       Log keyDown/keyUp/flagsChanged events from a listen-only CGEventTap
+  tap       Log key events and mouse clicks from a listen-only CGEventTap
   watch     hid + tap interleaved on one timeline (default)
 
 OPTIONS
@@ -27,6 +27,7 @@ OPTIONS
   --all-pages      hid/watch: also log generic-desktop and vendor pages (noisy)
   --raw            hid/watch: also log non-key keyboard usages (rollover, 0x00-0x03)
   --session        tap/watch: tap at session level instead of HID level
+                   (use it while mgl runs, to see events after mgl patched them)
 
 Press Ctrl-C to stop; a summary is printed on exit.
 Tip: pipe to a file with `| tee probe.log`.
@@ -66,7 +67,9 @@ while i < args.count {
 struct Summary {
     var hidKeyPresses: [String: [String: Int]] = [:]   // device -> key -> count
     var tapKeyboardTypes: [Int: Int] = [:]            // keyboardType -> keyDown count
-    var tapKeyDownsWithoutHeldModifiers = 0           // keyDown whose flags lack modifiers held globally
+    var tapKeyDownsWithoutHeldModifiers = 0           // keyDown whose flags lack held modifiers
+    var mouseDownsWithoutHeldModifiers = 0            // mouse clicks whose flags lack held modifiers
+    var syntheticEvents = 0                           // events posted by mgl (--sync-global)
 
     func print() {
         Swift.print("\n===== SUMMARY =====")
@@ -81,7 +84,9 @@ struct Summary {
         for (type, count) in tapKeyboardTypes.sorted(by: { $0.key < $1.key }) {
             Swift.print("  keyboardType \(type): \(count)")
         }
-        Swift.print("keyDown events missing a globally-held modifier: \(tapKeyDownsWithoutHeldModifiers)")
+        Swift.print("keyDown events missing a held modifier:     \(tapKeyDownsWithoutHeldModifiers)")
+        Swift.print("mouse clicks missing a held modifier:       \(mouseDownsWithoutHeldModifiers)")
+        Swift.print("synthetic MGL events seen (--sync-global):  \(syntheticEvents)")
     }
 }
 
@@ -117,7 +122,9 @@ func logHID(_ e: HIDInputEvent) {
 var tracker = ModifierTracker()
 
 func logTap(_ e: TapKeyEvent) {
-    if e.type == .flagsChanged { tracker.observeFlagsChanged(keyboardType: e.keyboardType, flags: e.flags) }
+    if e.type == .flagsChanged && !e.isSynthetic {
+        tracker.observeFlagsChanged(keyboardType: e.keyboardType, flags: e.flags)
+    }
     let held = tracker.held.intersection(ModifierFlags.relevantMask)
     let carried = e.flags.intersection(ModifierFlags.relevantMask)
     let missing = held.subtracting(carried)
@@ -125,18 +132,21 @@ func logTap(_ e: TapKeyEvent) {
         ? "  <-- MISSING \(ModifierFlags.describe(missing))" : ""
 
     print("\(String(format: "%11.3fms", e.timestampMs)) TAP  \(e.type.shortName) "
-        + "kc=\(String(e.keyCode).padding(toLength: 3, withPad: " ", startingAt: 0)) "
-        + "(\(KeyNames.macKeyCode(e.keyCode)))".padding(toLength: 14, withPad: " ", startingAt: 0)
+        + (e.isMouse ? "-".padding(toLength: 21, withPad: " ", startingAt: 0)
+            : "kc=\(String(e.keyCode).padding(toLength: 3, withPad: " ", startingAt: 0)) "
+              + "(\(KeyNames.macKeyCode(e.keyCode)))".padding(toLength: 14, withPad: " ", startingAt: 0))
         + "flags=\(ModifierFlags.describeHex(e.flags))  kbType=\(e.keyboardType) "
         + "srcState=\(e.sourceStateID) pid=\(e.sourcePID)\(e.isAutorepeat ? " REPEAT" : "")  "
         + "held=\(ModifierFlags.describe(tracker.held)) hidState=\(ModifierFlags.describe(e.hidSystemFlags)) "
         + "session=\(ModifierFlags.describe(e.sessionFlags))"
-        + warn)
+        + (e.isSynthetic ? "  [MGL-SYNTH]" : "") + warn)
 
     if e.type == .keyDown {
         summary.tapKeyboardTypes[e.keyboardType, default: 0] += 1
         if !missing.isEmpty { summary.tapKeyDownsWithoutHeldModifiers += 1 }
     }
+    if e.isMouse && !missing.isEmpty { summary.mouseDownsWithoutHeldModifiers += 1 }
+    if e.isSynthetic { summary.syntheticEvents += 1 }
 }
 
 // MARK: - Commands

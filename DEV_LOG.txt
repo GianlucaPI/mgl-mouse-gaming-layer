@@ -95,3 +95,34 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     in TextEdit, in World of Warcraft and in all system apps tested.
   - => Event-flag patching alone is enough for WoW keybinds.
   - NEXT: optional global-state sync mode (see next entry) before Phase 3/4.
+
+[2026-11-17] Phase 2 - Mouse-event patching + opt-in global-state sync
+  - Rationale: even though key patching works, the probe showed macOS's global
+    modifier state (hidSystemState/combinedSession) reads [] after a mouse key
+    while Shift is still held, until the next real modifier event. Exposed:
+      a) mouse clicks/scroll right after a side button (e.g. Shift-click to
+         link an item in WoW) inherit the empty state;
+      b) code that polls the current modifier state (NSEvent.modifierFlags,
+         some addons / macro conditionals) instead of reading event flags.
+  - (a) ModifierPatcher now also patches left/right/other mouse down/up and
+    scrollWheel flags. ON by default (--no-mouse to disable): same semantics as
+    key patching, only adds modifiers really held.
+  - (b) --sync-global (OFF by default): after a patched key event, a block on
+    the main queue (runs right after the tap callback returns) posts a
+    synthetic flagsChanged at the HID tap with flags = held | 0x100 and keycode
+    of a held modifier (ModifierFlags.representativeKeyCode, side-aware).
+    Events are tagged eventSourceUserData = 0x4D474C ("MGL"); our taps ignore
+    them, so they never feed the tracker (no feedback loop). Syncs coalesce.
+    No stuck modifiers: tap callbacks and the sync block run serially on the
+    same run loop, so the sync always uses the latest tracked state.
+    Opt-in because a synthetic modifier "press" may count towards
+    "press modifier twice" shortcuts (dictation, Sticky Keys...).
+  - mgl-probe: now also logs mouse-button downs (MISSING check applies), tags
+    synthetic MGL events [MGL-SYNTH], summary counts both.
+  - Tests: 15 passing (3 new for representativeKeyCode).
+  - NOT yet verified on hardware.
+  - NEXT (user): `mgl -v` + `mgl-probe watch --session --steelseries`:
+    hold Shift, press side button, then click -> click must carry Shift.
+    Then `mgl -v --sync-global`: after a side button, the probe's hidState/
+    session columns should show Shift again. Then move on to Phase 4 (config,
+    per-app activation); Phase 3 (seize) is not needed.

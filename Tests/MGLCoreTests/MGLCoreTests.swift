@@ -99,3 +99,26 @@ import Testing
         #expect(parseHexInt("zz") == nil)
     }
 }
+
+@Suite struct RepresentativeKeyCodeTests {
+    @Test func noneHeld() {
+        #expect(ModifierFlags.representativeKeyCode(for: []) == nil)
+        #expect(ModifierFlags.representativeKeyCode(for: .maskAlphaShift) == nil)
+    }
+
+    @Test func leftAndRightShift() {
+        let left = CGEventFlags(rawValue: CGEventFlags.maskShift.rawValue | ModifierFlags.leftShift)
+        let right = CGEventFlags(rawValue: CGEventFlags.maskShift.rawValue | ModifierFlags.rightShift)
+        #expect(ModifierFlags.representativeKeyCode(for: left) == 56)
+        #expect(ModifierFlags.representativeKeyCode(for: right) == 60)
+        #expect(ModifierFlags.representativeKeyCode(for: .maskShift) == 56)
+    }
+
+    @Test func priorityAndSides() {
+        let rightOpt = CGEventFlags(rawValue: CGEventFlags.maskAlternate.rawValue | ModifierFlags.rightOption)
+        #expect(ModifierFlags.representativeKeyCode(for: rightOpt) == 61)
+        #expect(ModifierFlags.representativeKeyCode(for: [.maskControl, .maskAlternate]) == 59)
+        let rightCmd = CGEventFlags(rawValue: CGEventFlags.maskCommand.rawValue | ModifierFlags.rightCommand)
+        #expect(ModifierFlags.representativeKeyCode(for: rightCmd) == 54)
+    }
+}

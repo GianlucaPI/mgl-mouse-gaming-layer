@@ -16,10 +16,14 @@ public struct TapKeyEvent {
     /// Global modifier state of the combined session at the moment of the callback.
     public let sessionFlags: CGEventFlags
     public let timestampMs: Double
+
+    public var isMouse: Bool { type != .keyDown && type != .keyUp && type != .flagsChanged }
+    /// Posted by MGL itself (e.g. --sync-global).
+    public var isSynthetic: Bool { Int64(sourceUserData) == MGL.syntheticEventMarker }
 }
 
-/// Listen-only CGEventTap for keyDown / keyUp / flagsChanged.
-/// Requires Input Monitoring (listen-only) — Phase 2 will use an active tap (Accessibility).
+/// Listen-only CGEventTap for keyDown / keyUp / flagsChanged and mouse-button downs.
+/// Requires Input Monitoring (listen-only). The active, modifying tap is `ModifierPatcher`.
 public final class EventTapMonitor {
     public typealias Handler = (TapKeyEvent) -> Void
 
@@ -34,7 +38,8 @@ public final class EventTapMonitor {
     }
 
     public func start() throws {
-        let types: [CGEventType] = [.keyDown, .keyUp, .flagsChanged]
+        let types: [CGEventType] = [.keyDown, .keyUp, .flagsChanged,
+                                    .leftMouseDown, .rightMouseDown, .otherMouseDown]
         let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << $1.rawValue) }
         let context = Unmanaged.passUnretained(self).toOpaque()
 
@@ -71,7 +76,7 @@ public final class EventTapMonitor {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return
-        case .keyDown, .keyUp, .flagsChanged:
+        case .keyDown, .keyUp, .flagsChanged, .leftMouseDown, .rightMouseDown, .otherMouseDown:
             break
         default:
             return
@@ -98,6 +103,9 @@ extension CGEventType {
         case .keyDown: return "keyDown "
         case .keyUp: return "keyUp   "
         case .flagsChanged: return "flagsChg"
+        case .leftMouseDown: return "lMouseDn"
+        case .rightMouseDown: return "rMouseDn"
+        case .otherMouseDown: return "oMouseDn"
         default: return "type\(rawValue)"
         }
     }

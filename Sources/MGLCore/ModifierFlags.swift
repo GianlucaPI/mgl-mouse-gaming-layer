@@ -13,6 +13,38 @@ public enum ModifierFlags {
     public static let rightOption: UInt64  = 0x0000_0040
     public static let rightControl: UInt64 = 0x0000_2000
 
+    /// NX_NONCOALSESCEDMASK: set on ordinary hardware events.
+    public static let nonCoalesced: UInt64 = 0x0000_0100
+
+    /// Virtual keycode of one modifier key that is held in `flags`, preferring the exact
+    /// side when the device-dependent bits say so. Order: Shift, Ctrl, Option, Command.
+    /// Used as the keycode of synthetic flagsChanged events. nil if no modifier is held.
+    public static func representativeKeyCode(for flags: CGEventFlags) -> CGKeyCode? {
+        let raw = flags.rawValue
+        let table: [(CGEventFlags, UInt64, CGKeyCode, CGKeyCode)] = [
+            // (mask, right-side bit, left keycode, right keycode)
+            (.maskShift, rightShift, 56, 60),
+            (.maskControl, rightControl, 59, 62),
+            (.maskAlternate, rightOption, 58, 61),
+            (.maskCommand, rightCommand, 55, 54),
+        ]
+        for (mask, rightBit, left, right) in table where flags.contains(mask) {
+            let leftBits = raw & (leftShift | leftControl | leftOption | leftCommand)
+            let onlyRight = raw & rightBit != 0 && leftBits & leftBit(for: mask) == 0
+            return onlyRight ? right : left
+        }
+        return nil
+    }
+
+    private static func leftBit(for mask: CGEventFlags) -> UInt64 {
+        switch mask {
+        case .maskShift: return leftShift
+        case .maskControl: return leftControl
+        case .maskAlternate: return leftOption
+        default: return leftCommand
+        }
+    }
+
     /// The device-independent modifier mask MGL cares about.
     public static let relevantMask: CGEventFlags = [.maskShift, .maskControl, .maskAlternate, .maskCommand]
 
