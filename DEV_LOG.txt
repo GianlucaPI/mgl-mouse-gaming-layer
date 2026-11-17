@@ -126,3 +126,19 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     Then `mgl -v --sync-global`: after a side button, the probe's hidState/
     session columns should show Shift again. Then move on to Phase 4 (config,
     per-app activation); Phase 3 (seize) is not needed.
+
+[2026-11-17] Phase 2 - Mouse patching / global state VERIFIED by the user
+  - Probe at session level (`watch --session --steelseries`) with mgl running:
+      * side button Y keyDown/keyUp: flags=[Shift(L)], kbType=40, no MISSING;
+      * HID log right after the key shows globalMods=[Shift(L)] and the tap
+        shows hidState=[Shift(L)] session=[Shift(L)] -> global modifier state
+        is now consistent (in the first test it read [] at this point);
+      * left click right after the side button: flags=[Shift(L)], no MISSING;
+      * Shift release: flagsChanged flags=[] held=[] hidState=[] (session still
+        shows Shift inside the callback: it is updated after the event is
+        processed, same as in the first test - expected, not a problem).
+  - WoW: macro with [mod:shift] conditional works with the side buttons.
+  - The pasted excerpt does not show a [MGL-SYNTH] line, so it does not say
+    whether --sync-global was on. --sync-global stays opt-in.
+  - Phase 2 complete. Phase 3 (seize & re-emit) not needed -> skipped.
+  - NEXT: Phase 4 (config file, per-app activation for WoW, profiles).

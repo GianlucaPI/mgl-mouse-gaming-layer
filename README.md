@@ -2,7 +2,7 @@
 
 A lightweight macOS input layer that makes **keyboard modifiers (Shift, Option, Control, Command)** work together with the side buttons of gaming mice that emit keyboard keystrokes — built first and foremost for the **SteelSeries Aerox 9 (12 side buttons)** and **World of Warcraft** on Apple Silicon.
 
-> Status: **pre-alpha — Phase 2 MVP (`mgl`) ready for in-game testing**. See [docs/ROADMAP.md](docs/ROADMAP.md) and [DEV_LOG.txt](DEV_LOG.txt).
+> Status: **alpha — Phase 2 complete, working in World of Warcraft**. See [docs/ROADMAP.md](docs/ROADMAP.md) and [DEV_LOG.txt](DEV_LOG.txt).
 
 ## The problem
 
@@ -65,7 +65,7 @@ swift build -c release
 | `--dry-run` | Log what would be patched, change nothing |
 | `-v`, `--verbose` | Log every patched / synced event |
 
-Verified so far (BLE): Shift + side button in TextEdit, World of Warcraft and macOS system apps.
+Verified so far (BLE): Shift + side button in TextEdit, World of Warcraft (keybinds and `[mod:shift]` macros) and macOS system apps; Shift-click right after a side button keeps Shift.
 
 `mgl-probe` commands: `list`, `perms`, `hid`, `tap`, `watch` (default). Options: `--steelseries`, `--vendor <hex>`, `--all-pages`, `--raw`, `--session`. Run `mgl-probe help` for details.
 

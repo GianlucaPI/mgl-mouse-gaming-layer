@@ -22,7 +22,7 @@ Confirm the exact root cause before writing the fix.
 
 **Exit criterion:** we know which device/events carry the button presses and why modifiers are lost.
 
-## Phase 2 — Core fix, Strategy A: flag-patching event tap (MVP) 🚧
+## Phase 2 — Core fix, Strategy A: flag-patching event tap (MVP) ✅
 The simplest approach; try first.
 - [x] Active `CGEventTap` at `kCGHIDEventTap` for keyDown/keyUp/flagsChanged (`ModifierPatcher`).
 - [x] Own modifier state per keyboardType from `flagsChanged` events, incl. left/right bits (`ModifierTracker`).
@@ -33,11 +33,11 @@ The simplest approach; try first.
 - [x] Verify in WoW: `Shift+side button` triggers the Shift keybind.
 - [x] Patch mouse clicks / scroll too (`--no-mouse` to disable): the global state is empty after a side-button press, so Shift-click could lose Shift.
 - [x] Opt-in `--sync-global`: after a patched mouse key, post a synthetic flagsChanged (tagged with `eventSourceUserData` = "MGL") to restore the global modifier state.
-- [ ] Verify Shift-click after a side-button press and `--sync-global` (probe `hidState`/`session` columns, WoW `[mod:shift]` macros).
+- [x] Verified: Shift-click right after a side-button press carries Shift; global state consistent; WoW `[mod:shift]` macros work.
 
 **Exit criterion:** Shift (and ideally Option/Ctrl) work with all 12 buttons in WoW.
 
-## Phase 3 — Strategy B (fallback / robustness): seize & re-emit
+## Phase 3 — Strategy B (fallback / robustness): seize & re-emit — ⏭️ skipped (Strategy A is sufficient)
 Only if A is insufficient (e.g. WoW reads modifiers from a per-device state, or flags patching is ignored).
 > ⚠️ Finding (2026-11-17): over Bluetooth LE the Aerox 9 exposes **one** HID interface carrying Mouse + Keyboard + Consumer + vendor collections. Seizing it would also swallow pointer movement and clicks, which would then have to be re-emitted too. Strategy A is strongly preferred; B is more viable over the 2.4 GHz dongle / USB if those expose a separate keyboard interface.
 - [ ] Open the Aerox 9 keyboard interface with `IOHIDManager` using `kIOHIDOptionsTypeSeizeDevice` so macOS no longer sees its keystrokes.
