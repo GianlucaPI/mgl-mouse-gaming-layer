@@ -16,13 +16,18 @@ public struct TapKeyEvent {
     /// Global modifier state of the combined session at the moment of the callback.
     public let sessionFlags: CGEventFlags
     public let timestampMs: Double
+    /// Mouse events: 0 = left, 1 = right, 2 = middle, 3+ = other buttons.
+    public let buttonNumber: Int
+    /// Scroll events only.
+    public let scroll: ScrollAxes?
+    public let scrollIsContinuous: Bool
 
     public var isMouse: Bool { type != .keyDown && type != .keyUp && type != .flagsChanged }
     /// Posted by MGL itself (e.g. --sync-global).
     public var isSynthetic: Bool { Int64(sourceUserData) == MGL.syntheticEventMarker }
 }
 
-/// Listen-only CGEventTap for keyDown / keyUp / flagsChanged and mouse-button downs.
+/// Listen-only CGEventTap for keyDown / keyUp / flagsChanged, mouse-button downs and scroll.
 /// Requires Input Monitoring (listen-only). The active, modifying tap is `ModifierPatcher`.
 public final class EventTapMonitor {
     public typealias Handler = (TapKeyEvent) -> Void
@@ -39,7 +44,7 @@ public final class EventTapMonitor {
 
     public func start() throws {
         let types: [CGEventType] = [.keyDown, .keyUp, .flagsChanged,
-                                    .leftMouseDown, .rightMouseDown, .otherMouseDown]
+                                    .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]
         let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << $1.rawValue) }
         let context = Unmanaged.passUnretained(self).toOpaque()
 
@@ -76,7 +81,7 @@ public final class EventTapMonitor {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return
-        case .keyDown, .keyUp, .flagsChanged, .leftMouseDown, .rightMouseDown, .otherMouseDown:
+        case .keyDown, .keyUp, .flagsChanged, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel:
             break
         default:
             return
@@ -92,7 +97,10 @@ public final class EventTapMonitor {
             sourceUserData: Int(event.getIntegerValueField(.eventSourceUserData)),
             hidSystemFlags: CGEventSource.flagsState(.hidSystemState),
             sessionFlags: CGEventSource.flagsState(.combinedSessionState),
-            timestampMs: ProbeClock.elapsedMs()
+            timestampMs: ProbeClock.elapsedMs(),
+            buttonNumber: Int(event.getIntegerValueField(.mouseEventButtonNumber)),
+            scroll: type == .scrollWheel ? ScrollAxes(event: event) : nil,
+            scrollIsContinuous: event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
         ))
     }
 }
@@ -106,6 +114,7 @@ extension CGEventType {
         case .leftMouseDown: return "lMouseDn"
         case .rightMouseDown: return "rMouseDn"
         case .otherMouseDown: return "oMouseDn"
+        case .scrollWheel: return "scroll  "
         default: return "type\(rawValue)"
         }
     }

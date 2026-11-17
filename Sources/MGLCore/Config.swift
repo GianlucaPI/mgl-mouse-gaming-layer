@@ -56,9 +56,12 @@ public struct Profile: Codable, Equatable {
     public var patchMouse: Bool?
     /// Restore macOS's global modifier state after a patched key. Default: false.
     public var syncGlobal: Bool?
+    /// Shift + mouse wheel handling (see ShiftScrollMode). Default: "system".
+    public var shiftScroll: ShiftScrollMode?
 
     public init(name: String, enabled: Bool? = nil, apps: [String]? = nil, modifiers: [ModifierName]? = nil,
-                keyboardTypes: [Int]? = nil, patchMouse: Bool? = nil, syncGlobal: Bool? = nil) {
+                keyboardTypes: [Int]? = nil, patchMouse: Bool? = nil, syncGlobal: Bool? = nil,
+                shiftScroll: ShiftScrollMode? = nil) {
         self.name = name
         self.enabled = enabled
         self.apps = apps
@@ -66,6 +69,7 @@ public struct Profile: Codable, Equatable {
         self.keyboardTypes = keyboardTypes
         self.patchMouse = patchMouse
         self.syncGlobal = syncGlobal
+        self.shiftScroll = shiftScroll
     }
 
     public var isEnabled: Bool { enabled ?? true }
@@ -105,7 +109,8 @@ public struct MGLConfig: Codable, Equatable {
             apps: ["com.blizzard.worldofwarcraft", "Wow", "World of Warcraft"],
             modifiers: ModifierName.allCases,
             patchMouse: true,
-            syncGlobal: false
+            syncGlobal: false,
+            shiftScroll: .vertical
         ),
         Profile(
             name: "Everywhere else",
@@ -113,7 +118,8 @@ public struct MGLConfig: Codable, Equatable {
             apps: [],
             modifiers: ModifierName.allCases,
             patchMouse: true,
-            syncGlobal: false
+            syncGlobal: false,
+            shiftScroll: .system
         ),
     ])
 
@@ -210,6 +216,7 @@ public struct PatchSettings: Equatable {
     public var keyboardTypes: Set<Int>?
     public var patchMouse: Bool
     public var syncGlobal: Bool
+    public var shiftScroll: ShiftScrollMode
 
     public init(profile: Profile) {
         profileName = profile.name
@@ -217,6 +224,7 @@ public struct PatchSettings: Equatable {
         keyboardTypes = profile.keyboardTypes.map(Set.init)
         patchMouse = profile.patchMouse ?? true
         syncGlobal = profile.syncGlobal ?? false
+        shiftScroll = profile.shiftScroll ?? .system
     }
 
     /// Command-line overrides applied on top of every profile.

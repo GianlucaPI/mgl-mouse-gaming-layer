@@ -166,6 +166,7 @@ func describe(_ s: PatchSettings) -> String {
     if let k = s.keyboardTypes { parts.append("kbType=\(k.sorted().map(String.init).joined(separator: ","))") }
     parts.append(s.patchMouse ? "mouse=on" : "mouse=off")
     if s.syncGlobal { parts.append("sync-global") }
+    if s.shiftScroll != .system { parts.append("shift-scroll=\(s.shiftScroll.rawValue)") }
     return parts.joined(separator: " ")
 }
 
@@ -178,6 +179,9 @@ let engine = MGLEngine(configURL: configURL, dryRun: dryRun, overrides: override
             + "\(ModifierFlags.describe(original)) -> \(ModifierFlags.describe(patched))")
     case let .synced(flags, keyCode):
         print("\(ProbeClock.stamp()) synced global state \(ModifierFlags.describe(flags)) via \(KeyNames.macKeyCode(keyCode))")
+    case let .shiftScrollFixed(before, after, original, patched):
+        print("\(ProbeClock.stamp()) \(dryRun ? "WOULD FIX" : "fixed") shift-scroll  \(before.summary) -> \(after.summary)  "
+            + "\(ModifierFlags.describe(original)) -> \(ModifierFlags.describe(patched))")
     }
 }
 engine.forcedProfile = forcedProfile
@@ -222,7 +226,7 @@ for sig in [SIGINT, SIGTERM] {
         engine.stop()
         let p = engine.patcher
         print("\nStopped. Patched keys: \(p.patchedKeyCount), mouse events: \(p.patchedMouseCount), "
-            + "global syncs: \(p.syncCount), tap restarts: \(p.tapRestarts)")
+            + "shift-scroll fixes: \(p.scrollFixCount), global syncs: \(p.syncCount), tap restarts: \(p.tapRestarts)")
         exit(0)
     }
     src.resume()

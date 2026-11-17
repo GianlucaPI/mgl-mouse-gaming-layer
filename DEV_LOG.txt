@@ -233,3 +233,48 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     Accessibility to MGL, test WoW switching from the menu bar, rebuild once
     to confirm the permission is kept, toggle Launch at Login. Quit any
     running `mgl` CLI first (two layers would both patch, harmless but noisy).
+
+[2026-11-17] Phase 5 - User test: app OK; Shift + wheel / middle click broken
+  - Reported: MGL.app installs and runs, side buttons work. NOT working in
+    WoW: Shift + wheel up, Shift + wheel down, Shift + middle click. Wheel up
+    needs ~3 notches before it "works".
+  - Research: macOS converts Shift + vertical wheel (non-continuous mice) into
+    a HORIZONTAL scroll and keeps Shift in the flags; games therefore never
+    see SHIFT-MOUSEWHEELUP/DOWN. Known for WoW/Minecraft/Dear ImGui; existing
+    workaround tools drop Shift from scroll events (games track Shift via
+    flagsChanged anyway). Refs: Apple discussions thread 253391792, Dear ImGui
+    commit "Fix mouse wheel axis swap when using SHIFT on macOS".
+  - Code review findings:
+      1. MGL itself ADDS Shift to scroll events when the (reset) global state
+         lacks it, which can trigger the conversion; combined with the global
+         modifier state being reset by the mouse's own reports, the conversion
+         happens inconsistently -> likely cause of the "3 notches" behavior.
+      2. mgl-probe could not diagnose any of this: scroll events were not
+         tapped, the HID wheel usage (page 0x01 / 0x38) was filtered out, and
+         otherMouseDown did not report WHICH button.
+  - Fix: new profile option `shiftScroll` (ScrollFix.swift):
+      system               leave macOS behavior (default; right for browsers)
+      vertical             if the tick arrives horizontal-only, move the
+                           deltas back to axis 1 (line, fixed-point, pixel;
+                           same sign) and strip Shift (both sides) from the
+                           scroll event so nothing converts it again
+      vertical-keep-shift  move back to vertical, keep Shift in the flags
+    Applies only to non-continuous scroll (wheel mice; trackpads untouched)
+    while Shift is held (our tracker) or present in the event. Other held
+    modifiers are still added. Example WoW profile now uses "vertical".
+    Verbose CLI logs "fixed shift-scroll  v=../h=.. -> ..". New stat counter.
+  - The user's own ~/Library/Application Support/MGL/config.json got
+    "shiftScroll": "vertical" in the WoW profile (backup: config.json.bak).
+  - mgl-probe: taps scrollWheel (axes v/h as line/fixed/pixel, wheel vs
+    continuous, direction, "<-- SHIFT→HORIZONTAL" marker) and logs mouse
+    button numbers (0 left, 1 right, 2 middle, 3+ other); HID log now shows
+    the wheel usage.
+  - Tests: 33 passing (7 new in ScrollFixTests).
+  - Middle click: no code bug found (otherMouseDown is patched like the other
+    buttons). Needs probe data: it may not be button 2 on the Aerox 9 or WoW
+    may need something else.
+  - NOT verified on hardware yet.
+  - NEXT (user): rebuild + reinstall the app, test Shift+wheel up/down in
+    WoW; if still failing try "vertical-keep-shift". Run
+    `mgl-probe watch --session --steelseries` while pressing Shift + wheel /
+    Shift + middle click (with MGL running) and share the output.

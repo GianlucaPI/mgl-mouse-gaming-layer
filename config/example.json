@@ -15,6 +15,7 @@
       ],
       "name" : "World of Warcraft",
       "patchMouse" : true,
+      "shiftScroll" : "vertical",
       "syncGlobal" : false
     },
     {
@@ -30,6 +31,7 @@
       ],
       "name" : "Everywhere else",
       "patchMouse" : true,
+      "shiftScroll" : "system",
       "syncGlobal" : false
     }
   ],

@@ -13,6 +13,7 @@ public final class ModifierPatcher {
         case patched(type: CGEventType, keyCode: Int, keyboardType: Int,
                      original: CGEventFlags, patched: CGEventFlags)
         case synced(flags: CGEventFlags, keyCode: Int)
+        case shiftScrollFixed(before: ScrollAxes, after: ScrollAxes, original: CGEventFlags, patched: CGEventFlags)
     }
 
     /// Active settings; nil = inactive (pass-through).
@@ -21,6 +22,7 @@ public final class ModifierPatcher {
     public private(set) var patchedKeyCount = 0
     public private(set) var patchedMouseCount = 0
     public private(set) var syncCount = 0
+    public private(set) var scrollFixCount = 0
     public private(set) var tapRestarts = 0
 
     private static let types: [CGEventType] = [
@@ -107,12 +109,33 @@ public final class ModifierPatcher {
             // A key without the held modifiers means the global state was just reset.
             if settings.syncGlobal && !dryRun { scheduleSync() }
 
+        case .scrollWheel where settings.shiftScroll != .system && shiftScrollApplies(event, settings):
+            let original = event.flags
+            let withHeld = settings.patchMouse ? tracker.patched(original, mask: settings.modifierMask) : original
+            let before = ScrollAxes(event: event)
+            let fixed = ShiftScroll.fix(axes: before, flags: withHeld, mode: settings.shiftScroll)
+            guard fixed.axes != before || fixed.flags != original else { return }
+            if !dryRun {
+                if fixed.axes != before { fixed.axes.write(to: event) }
+                event.flags = fixed.flags
+            }
+            scrollFixCount += 1
+            onActivity(.shiftScrollFixed(before: before, after: fixed.axes, original: original, patched: fixed.flags))
+
         default:  // mouse buttons and scroll
             guard settings.patchMouse else { return }
             if patch(event, type: type, keyCode: -1, keyboardType: -1, mask: settings.modifierMask) {
                 patchedMouseCount += 1
             }
         }
+    }
+
+    /// Shift is held (per our tracking or the event itself) and the event comes from a
+    /// notched wheel (trackpads / Magic Mouse are continuous and left alone).
+    private func shiftScrollApplies(_ event: CGEvent, _ settings: PatchSettings) -> Bool {
+        guard event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0 else { return false }
+        let shiftHeld = tracker.held.contains(.maskShift) && settings.modifierMask & ModifierName.shift.mask != 0
+        return shiftHeld || event.flags.contains(.maskShift)
     }
 
     /// ORs held modifiers into the event. Returns true if the flags were missing some.

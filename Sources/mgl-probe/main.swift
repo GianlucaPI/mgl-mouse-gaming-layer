@@ -19,7 +19,7 @@ COMMANDS
   perms     Show (and request) Input Monitoring / Accessibility permissions
   apps      Log the frontmost app (name + bundle id) on every switch, for config "apps"
   hid       Log raw HID input values (keyboard, button, consumer pages)
-  tap       Log key events and mouse clicks from a listen-only CGEventTap
+  tap       Log key events, mouse clicks and scroll from a listen-only CGEventTap
   watch     hid + tap interleaved on one timeline (default)
 
 OPTIONS
@@ -103,6 +103,8 @@ func logHID(_ e: HIDInputEvent) {
         return  // AC Pan = 0, re-sent by the Aerox 9 in every report
     case 0x09, 0x0C:
         break
+    case 0x01 where e.usage == 0x38:
+        break  // wheel (other generic-desktop usages = pointer motion, too noisy)
     default:
         if !allPages { return }
     }
@@ -133,14 +135,16 @@ func logTap(_ e: TapKeyEvent) {
         ? "  <-- MISSING \(ModifierFlags.describe(missing))" : ""
 
     print("\(String(format: "%11.3fms", e.timestampMs)) TAP  \(e.type.shortName) "
-        + (e.isMouse ? "-".padding(toLength: 21, withPad: " ", startingAt: 0)
+        + (e.isMouse ? mouseDetail(e).padding(toLength: 21, withPad: " ", startingAt: 0)
             : "kc=\(String(e.keyCode).padding(toLength: 3, withPad: " ", startingAt: 0)) "
               + "(\(KeyNames.macKeyCode(e.keyCode)))".padding(toLength: 14, withPad: " ", startingAt: 0))
         + "flags=\(ModifierFlags.describeHex(e.flags))  kbType=\(e.keyboardType) "
         + "srcState=\(e.sourceStateID) pid=\(e.sourcePID)\(e.isAutorepeat ? " REPEAT" : "")  "
         + "held=\(ModifierFlags.describe(tracker.held)) hidState=\(ModifierFlags.describe(e.hidSystemFlags)) "
         + "session=\(ModifierFlags.describe(e.sessionFlags))"
-        + (e.isSynthetic ? "  [MGL-SYNTH]" : "") + warn)
+        + (e.isSynthetic ? "  [MGL-SYNTH]" : "") + warn
+        + (e.scroll.map { "  axes: \($0.summary)\(e.scrollIsContinuous ? " continuous" : " wheel")" } ?? "")
+        + (e.scroll.map { $0.isHorizontalOnly && held.contains(.maskShift) ? "  <-- SHIFT→HORIZONTAL" : "" } ?? ""))
 
     if e.type == .keyDown {
         summary.tapKeyboardTypes[e.keyboardType, default: 0] += 1
@@ -148,6 +152,23 @@ func logTap(_ e: TapKeyEvent) {
     }
     if e.isMouse && !missing.isEmpty { summary.mouseDownsWithoutHeldModifiers += 1 }
     if e.isSynthetic { summary.syntheticEvents += 1 }
+}
+
+func mouseDetail(_ e: TapKeyEvent) -> String {
+    if let scroll = e.scroll {
+        // Positive axis 1 = up, positive axis 2 = left (CGEvent convention).
+        let v = scroll.fixed1 != 0 ? scroll.fixed1 : Double(scroll.delta1)
+        let h = scroll.fixed2 != 0 ? scroll.fixed2 : Double(scroll.delta2)
+        if v != 0 { return v > 0 ? "wheel up" : "wheel down" }
+        if h != 0 { return h > 0 ? "wheel left" : "wheel right" }
+        return "wheel 0"
+    }
+    switch e.buttonNumber {
+    case 0: return "button 0 (left)"
+    case 1: return "button 1 (right)"
+    case 2: return "button 2 (middle)"
+    default: return "button \(e.buttonNumber)"
+    }
 }
 
 // MARK: - Commands
