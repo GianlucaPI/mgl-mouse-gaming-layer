@@ -424,3 +424,28 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     avoid surprising behavior), normalizeWheel stays true. shiftScroll is
     documented as experimental. The user's own config is left as they set it.
   - Tests: 39 passing.
+
+[2026-11-17] Release prep v0.1.0 (repo ready to publish)
+  - LICENSE: MIT, copyright "MGL contributors" (owner can change the name).
+  - CI: .github/workflows/ci.yml on macos-15 — release build, unit tests
+    (scripts/test.sh falls back to plain `swift test` under Xcode), CLI smoke
+    tests (mgl config init/check, mgl-probe list/appkit), ad-hoc signed
+    MGL.app zipped and uploaded as artifact, uninstall dry run. Not run yet
+    (needs the push to GitHub).
+  - scripts/uninstall.sh: removes MGL.app from /Applications and
+    ~/Applications after unregistering Launch at Login (new hidden app flag
+    `MGL --unregister-login-item`), stops running MGL / CLI mgl; --config,
+    --prefs, --cert, --all (also `tccutil reset Accessibility` for our bundle
+    id), --dry-run, --yes; asks for confirmation. Verified only with
+    --all --dry-run here (nothing removed).
+  - App icon: scripts/make-icon.swift draws SF Symbol computermouse.fill on a
+    dark rounded gradient with an orange ring -> Resources/AppIcon.icns via
+    iconutil; build-app.sh copies it and sets CFBundleIconFile.
+  - Version 0.1.0 (was 0.1.0-dev); CHANGELOG.md with the 0.1.0 entry and the
+    Shift+wheel known issue. README: Uninstall + Development sections, MIT.
+  - TODO.md: deferred items — shiftScroll "keys" mode (Shift+wheel fix),
+    stale-modifier guard, forced-profile indicator in the menu, warning when
+    two layers run, per-button remap, VID/PID match, cleanup of local config
+    backups.
+  - Verified: release build, 39 tests, ad-hoc MGL.app 0.1.0 build with icon.
+  - Git tag v0.1.0 created locally (push with --follow-tags).

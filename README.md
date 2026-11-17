@@ -42,8 +42,11 @@ MGL_mouse_gaming_layer/
 │   └── MGLMenuBar/     # the menu-bar app (MGL.app)
 ├── Tests/MGLCoreTests/
 ├── config/example.json
-├── scripts/            # test.sh, build-app.sh, create-signing-identity.sh
-├── docs/ROADMAP.md
+├── Resources/AppIcon.icns
+├── scripts/            # test.sh, build-app.sh, create-signing-identity.sh, uninstall.sh, make-icon.swift
+├── .github/workflows/  # CI
+├── docs/ROADMAP.md, docs/KNOWN_ISSUES.md
+├── CHANGELOG.md, TODO.md, LICENSE
 ├── DEV_LOG.txt
 └── README.md
 ```
@@ -143,6 +146,20 @@ Verified so far (BLE): Shift + side button in TextEdit, World of Warcraft (keybi
 
 MGL performs **1:1 input remapping** (one physical press → one keystroke with modifiers). It does not implement macros, timed sequences or automation, which keeps it in line with Blizzard's rules on input software. Do not extend it in that direction.
 
+## Uninstall
+
+```bash
+./scripts/uninstall.sh --dry-run   # show what would be removed
+./scripts/uninstall.sh             # MGL.app + Launch at Login, stops running MGL/mgl
+./scripts/uninstall.sh --all       # also config, preferences, signing identity, Accessibility entry
+```
+
+## Development
+
+- CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)): release build, unit tests, CLI smoke tests, ad-hoc signed `MGL.app` uploaded as a build artifact, uninstall dry run.
+- Changes per version: [CHANGELOG.md](CHANGELOG.md) · planned work: [TODO.md](TODO.md) · open bugs: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) · step-by-step history: [DEV_LOG.txt](DEV_LOG.txt).
+- App icon: `swift scripts/make-icon.swift` regenerates `Resources/AppIcon.icns`.
+
 ## License
 
-TBD (MIT suggested).
+[MIT](LICENSE)

@@ -270,6 +270,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 }
 
+// Used by scripts/uninstall.sh: remove the "Launch at Login" registration and exit.
+if CommandLine.arguments.contains("--unregister-login-item") {
+    do {
+        try SMAppService.mainApp.unregister()
+        print("MGL: login item unregistered")
+    } catch {
+        print("MGL: login item not registered (\(error.localizedDescription))")
+    }
+    exit(0)
+}
+
 // Top-level code runs on the main thread.
 MainActor.assumeIsolated {
     let app = NSApplication.shared

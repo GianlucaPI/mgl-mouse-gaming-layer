@@ -1,7 +1,7 @@
 import Foundation
 
 public enum MGL {
-    public static let version = "0.1.0-dev"
+    public static let version = "0.1.0"
 
     /// SteelSeries vendor IDs: 0x1038 over USB / 2.4 GHz dongle,
     /// 0x0111 over Bluetooth LE (Bluetooth SIG-assigned company ID).

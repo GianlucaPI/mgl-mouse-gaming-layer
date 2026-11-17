@@ -42,6 +42,7 @@ echo "==> Assembling $APP"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"   # regenerate: swift scripts/make-icon.swift
 
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -53,6 +54,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleIdentifier</key>           <string>$BUNDLE_ID</string>
   <key>CFBundleExecutable</key>           <string>$APP_NAME</string>
   <key>CFBundlePackageType</key>          <string>APPL</string>
+  <key>CFBundleIconFile</key>             <string>AppIcon</string>
   <key>CFBundleShortVersionString</key>   <string>$SHORT_VERSION</string>
   <key>CFBundleVersion</key>              <string>$BUILD_NUMBER</string>
   <key>LSMinimumSystemVersion</key>       <string>13.0</string>

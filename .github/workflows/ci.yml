@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  build-test:
+    name: Build, test, package
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # build number = commit count (scripts/build-app.sh)
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Build (all products, release)
+        run: swift build -c release
+
+      - name: Unit tests
+        run: ./scripts/test.sh
+
+      - name: CLI smoke test
+        run: |
+          .build/release/mgl --help >/dev/null
+          .build/release/mgl config init --config "$RUNNER_TEMP/config.json"
+          .build/release/mgl config check --config "$RUNNER_TEMP/config.json"
+          .build/release/mgl-probe list
+          .build/release/mgl-probe appkit
+
+      - name: Package MGL.app (ad-hoc signed)
+        run: |
+          ./scripts/build-app.sh
+          ditto -c -k --keepParent build/MGL.app build/MGL-app.zip
+
+      - name: Uninstall script dry run
+        run: ./scripts/uninstall.sh --all --dry-run
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MGL-app
+          path: build/MGL-app.zip
+          if-no-files-found: error
