@@ -16,7 +16,7 @@
       "name" : "World of Warcraft",
       "normalizeWheel" : true,
       "patchMouse" : true,
-      "shiftScroll" : "vertical-keep-shift",
+      "shiftScroll" : "system",
       "syncGlobal" : false
     },
     {

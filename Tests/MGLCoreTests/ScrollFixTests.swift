@@ -93,7 +93,7 @@ import Testing
         #expect(s.normalizeWheel)
         let d = PatchSettings(profile: Profile(name: "D"))
         #expect(d.shiftScroll == .system && !d.normalizeWheel)
-        #expect(MGLConfig.example.profiles[0].shiftScroll == .verticalKeepShift)
+        #expect(MGLConfig.example.profiles[0].shiftScroll == .system)
         #expect(MGLConfig.example.profiles[0].normalizeWheel == true)
         let bad = #"{"version":1,"profiles":[{"name":"P","shiftScroll":"sideways"}]}"#
         #expect(throws: ConfigError.self) { try MGLConfig.decode(Data(bad.utf8)) }

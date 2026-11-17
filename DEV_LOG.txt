@@ -409,3 +409,18 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
   - NEXT (user): stop the CLI mgl, Profile -> Automatic, set shiftScroll to
     "vertical", test Shift + wheel in WoW. If Ctrl-C issue reappears, send
     probe output including the keys= column.
+
+[2026-11-17] Shift + wheel: OPEN BUG documented
+  - User report: shiftScroll "vertical" (Shift stripped at the late stage)
+    does not work in WoW either -> WoW takes wheel modifiers from the event.
+    With every mode exhausted, Shift + wheel is an open bug.
+  - Added docs/KNOWN_ISSUES.md (#1): symptoms, root cause (AppKit converts
+    Shift + notch to horizontal inside the app), evidence (probe --late,
+    `mgl-probe appkit` table), every attempt and its result, the working
+    normalizeWheel fix, workaround (bind with another modifier) and the
+    proposed fix: shiftScroll "keys" (Shift + notch -> synthetic key press,
+    1:1). README shows a warning banner linking to it; ROADMAP links it.
+  - Example config: WoW profile shiftScroll back to "system" (no mode helps;
+    avoid surprising behavior), normalizeWheel stays true. shiftScroll is
+    documented as experimental. The user's own config is left as they set it.
+  - Tests: 39 passing.

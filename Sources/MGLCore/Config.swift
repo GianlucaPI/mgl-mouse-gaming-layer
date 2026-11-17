@@ -114,7 +114,8 @@ public struct MGLConfig: Codable, Equatable {
             modifiers: ModifierName.allCases,
             patchMouse: true,
             syncGlobal: false,
-            shiftScroll: .verticalKeepShift,
+            // No shiftScroll mode makes Shift + wheel work in WoW (docs/KNOWN_ISSUES.md #1).
+            shiftScroll: .system,
             normalizeWheel: true
         ),
         Profile(

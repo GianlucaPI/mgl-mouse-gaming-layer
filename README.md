@@ -2,7 +2,9 @@
 
 A lightweight macOS input layer that makes **keyboard modifiers (Shift, Option, Control, Command)** work together with the side buttons of gaming mice that emit keyboard keystrokes — built first and foremost for the **SteelSeries Aerox 9 (12 side buttons)** and **World of Warcraft** on Apple Silicon.
 
-> Status: **alpha — working in World of Warcraft; Phase 5 menu-bar app implemented**. See [docs/ROADMAP.md](docs/ROADMAP.md) and [DEV_LOG.txt](DEV_LOG.txt).
+> Status: **alpha — working in World of Warcraft; Phase 5 menu-bar app implemented**. See [docs/ROADMAP.md](docs/ROADMAP.md), [DEV_LOG.txt](DEV_LOG.txt) and **[docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)**.
+
+> ⚠️ **Known issue:** Shift + mouse wheel bindings (`SHIFT-MOUSEWHEELUP/DOWN`) do not work in WoW — macOS/AppKit turns them into horizontal scrolling inside the game. Details, evidence and workarounds in [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md#1-shift--mouse-wheel-does-not-trigger-wow-bindings-shift-mousewheelup--shift-mousewheeldown).
 
 ## The problem
 
@@ -92,7 +94,7 @@ swift build -c release
       "apps": ["com.blizzard.worldofwarcraft", "Wow", "World of Warcraft"],
       "modifiers": ["shift", "control", "option", "command"],
       "patchMouse": true,
-      "shiftScroll": "vertical-keep-shift",
+      "shiftScroll": "system",
       "normalizeWheel": true,
       "syncGlobal": false
     },
@@ -110,7 +112,7 @@ swift build -c release
 | `keyboardTypes` | Only patch key events from these keyboard types (Aerox 9 over BLE = `40`) | any |
 | `patchMouse` | Patch mouse clicks / scroll | `true` |
 | `syncGlobal` | Restore macOS's global modifier state (experimental) | `false` |
-| `shiftScroll` | Shift + mouse wheel: `system` (AppKit turns it into horizontal scroll inside the app), `vertical-keep-shift` (keep vertical + Shift by presenting the notch as a precise scroll, which AppKit does not convert — for WoW `SHIFT-MOUSEWHEELUP/DOWN`), `vertical` (drop Shift from the scroll event — only for games that track Shift themselves). Case, spaces and `_` are tolerated | `system` |
+| `shiftScroll` | *Experimental — does not fix WoW, see Known issues.* Shift + mouse wheel: `system` (AppKit turns it into horizontal scroll inside the app), `vertical-keep-shift` (keep vertical + Shift by presenting the notch as a precise scroll, which AppKit does not convert — for WoW `SHIFT-MOUSEWHEELUP/DOWN`), `vertical` (drop Shift from the scroll event — only for games that track Shift themselves). Case, spaces and `_` are tolerated | `system` |
 | `normalizeWheel` | Make every wheel notch worth at least one line (macOS may report 0.1 per notch, so games need several notches to react) | `false` |
 
 **Resolution:** the first enabled profile whose `apps` contains the frontmost app wins; otherwise the first enabled catch-all profile; otherwise mgl is inactive (events pass through untouched). MGL switches profile instantly when you change app. Use `mgl-probe apps` to discover an app's name and bundle ID.
