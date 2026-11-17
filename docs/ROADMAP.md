@@ -29,8 +29,8 @@ The simplest approach; try first.
 - [x] On keyDown/keyUp whose flags lack held modifiers → OR them into `event.flags` and pass the event on.
 - [x] Tap timeouts: re-enable the tap and reset tracked state (avoid stuck modifiers).
 - [x] Permission check & prompt (`AXIsProcessTrustedWithOptions`); `--dry-run`, `--kbtype`, `--verbose`.
-- [ ] Verify outside games: `mgl` running + `mgl-probe watch --session` shows patched flags; Shift+side button types uppercase in TextEdit.
-- [ ] Verify in WoW: `Shift+side button` triggers the Shift keybind.
+- [x] Verify outside games: Shift+side button types uppercase in TextEdit and works in system apps.
+- [x] Verify in WoW: `Shift+side button` triggers the Shift keybind.
 - [ ] If WoW ignores event flags (reads global state): add a "sync" mode that also restores the global modifier state.
 
 **Exit criterion:** Shift (and ideally Option/Ctrl) work with all 12 buttons in WoW.

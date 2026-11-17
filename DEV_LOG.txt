@@ -89,3 +89,9 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
   - NEXT (user): grant Accessibility to Terminal; run `mgl -v`, hold Shift +
     side button in TextEdit (expect uppercase), then in WoW with a Shift
     keybind. If WoW still sees no Shift -> implement global-state sync mode.
+
+[2026-11-17] Phase 2 - MVP VERIFIED by the user
+  - `mgl -v` with Accessibility granted to Terminal: Shift + side button works
+    in TextEdit, in World of Warcraft and in all system apps tested.
+  - => Event-flag patching alone is enough for WoW keybinds.
+  - NEXT: optional global-state sync mode (see next entry) before Phase 3/4.
