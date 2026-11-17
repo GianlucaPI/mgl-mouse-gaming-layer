@@ -17,7 +17,7 @@ MGL sits between the hardware and the game:
 1. An active `CGEventTap` tracks, from `flagsChanged` events, which modifiers are held on each keyboard (MGL keeps its own state because the system one is unreliable here).
 2. Every keyDown/keyUp that arrives without those modifiers (e.g. from the mouse) gets them added to its flags. Mouse clicks and scroll events are patched the same way, because after a side-button press macOS's global modifier state reads empty and a following Shift-click would otherwise lose Shift.
 3. The game sees `Shift+1`, `Opt+1`, `Ctrl+1`, …
-4. For Shift + mouse wheel (`shiftScroll`), a second tap at the last stage before apps moves wheel ticks that macOS turned horizontal back to the vertical axis.
+4. A second tap at the last stage before apps adjusts mouse-wheel notches: `normalizeWheel` makes each notch a whole line, and `shiftScroll` keeps Shift + wheel vertical (AppKit would otherwise turn it horizontal inside the game).
 5. Optionally (`--sync-global`), MGL also restores macOS's *global* modifier state with a synthetic modifier event, for apps/addons that query the current modifier state instead of reading it from the event.
 
 Profiles in a JSON config decide **when** MGL is active (e.g. only while World of Warcraft is in the foreground) and **how** (which modifiers, mouse patching, global sync).
@@ -93,6 +93,7 @@ swift build -c release
       "modifiers": ["shift", "control", "option", "command"],
       "patchMouse": true,
       "shiftScroll": "vertical-keep-shift",
+      "normalizeWheel": true,
       "syncGlobal": false
     },
     { "name": "Everywhere else", "enabled": false, "apps": [] }
@@ -109,7 +110,8 @@ swift build -c release
 | `keyboardTypes` | Only patch key events from these keyboard types (Aerox 9 over BLE = `40`) | any |
 | `patchMouse` | Patch mouse clicks / scroll | `true` |
 | `syncGlobal` | Restore macOS's global modifier state (experimental) | `false` |
-| `shiftScroll` | Shift + mouse wheel: `system` (macOS turns it into horizontal scroll), `vertical-keep-shift` (keep it vertical with Shift — for WoW `SHIFT-MOUSEWHEELUP/DOWN`), `vertical` (keep it vertical and drop Shift from the scroll event — only for games that track Shift themselves). Case, spaces and `_` are tolerated | `system` |
+| `shiftScroll` | Shift + mouse wheel: `system` (AppKit turns it into horizontal scroll inside the app), `vertical-keep-shift` (keep vertical + Shift by presenting the notch as a precise scroll, which AppKit does not convert — for WoW `SHIFT-MOUSEWHEELUP/DOWN`), `vertical` (drop Shift from the scroll event — only for games that track Shift themselves). Case, spaces and `_` are tolerated | `system` |
+| `normalizeWheel` | Make every wheel notch worth at least one line (macOS may report 0.1 per notch, so games need several notches to react) | `false` |
 
 **Resolution:** the first enabled profile whose `apps` contains the frontmost app wins; otherwise the first enabled catch-all profile; otherwise mgl is inactive (events pass through untouched). MGL switches profile instantly when you change app. Use `mgl-probe apps` to discover an app's name and bundle ID.
 

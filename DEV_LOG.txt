@@ -341,3 +341,34 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     is available.
   - NEXT (user): `mgl-probe watch --late --steelseries` with MGL running,
     Shift + wheel up/down; share the output.
+
+[2026-11-17] Phase 5 - Shift + wheel: AppKit converts inside the app; wheel 0.1/notch
+  - Probe `watch --late --steelseries` with MGL running (Shift + wheel):
+        HID wheel usage 0x01/0x38 val=+1 / -1
+        late tap: "scroll wheel up   flags=[Shift(L)] axes v=1/0.10/1px h=0 wheel"
+                  "scroll wheel down flags=[Shift(L)] axes v=-1/-0.10/-1px"
+  - FINDING 1: at the LAST tap stage the tick is still VERTICAL with Shift.
+    So the conversion to horizontal is not in the WindowServer but in AppKit,
+    inside WoW, when the NSEvent is built. No tap can undo it afterwards.
+    AppKit only does it for non-precise scrolls (trackpads are not swapped).
+  - FINDING 2: each notch is worth only 0.10 lines (fixed-point delta), 1 px.
+    Games accumulating deltaY need several notches: very likely the reported
+    "wheel up must be turned ~3 times before it works".
+  - Fix (late tap, WheelFix.apply, pure + tested):
+      * shiftScroll "vertical-keep-shift": keep vertical axis + Shift, ensure
+        Shift bits, and mark the event scrollWheelEventIsContinuous = 1
+        (precise) with >= 10 px per line, so AppKit does not swap it;
+      * shiftScroll "vertical": strip Shift (unchanged idea);
+      * new profile option normalizeWheel: fixed-point delta >= line delta
+        per axis (0.1 -> 1.0), accelerated values kept. ON in the example WoW
+        profile and in the user's config (backup config.json.bak2).
+    Only notched (non-continuous) wheel events are touched; HID-stage scroll
+    special-casing removed (normal modifier patching only).
+  - mgl-probe --late now appends at the TAIL of the annotated-session stage,
+    so it shows events after MGL's late tap; precise ticks print "PRECISE".
+  - Tests: 39 passing (WheelFix suite rewritten with the real 0.10 values).
+  - Release CLI tools rebuilt. NOT verified in WoW.
+  - Risk: WoW might handle precise scrolls differently (e.g. needs more
+    pixels). If so: tune pixelsPerLine or try "vertical".
+  - NEXT (user): build-app.sh --install; test wheel (1 notch) and Shift +
+    wheel in WoW; if needed, `mgl-probe watch --late --steelseries` output.

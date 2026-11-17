@@ -58,10 +58,13 @@ public struct Profile: Codable, Equatable {
     public var syncGlobal: Bool?
     /// Shift + mouse wheel handling (see ShiftScrollMode). Default: "system".
     public var shiftScroll: ShiftScrollMode?
+    /// Make every wheel notch worth at least one line (fixes games needing several
+    /// notches to react). Default: false.
+    public var normalizeWheel: Bool?
 
     public init(name: String, enabled: Bool? = nil, apps: [String]? = nil, modifiers: [ModifierName]? = nil,
                 keyboardTypes: [Int]? = nil, patchMouse: Bool? = nil, syncGlobal: Bool? = nil,
-                shiftScroll: ShiftScrollMode? = nil) {
+                shiftScroll: ShiftScrollMode? = nil, normalizeWheel: Bool? = nil) {
         self.name = name
         self.enabled = enabled
         self.apps = apps
@@ -70,6 +73,7 @@ public struct Profile: Codable, Equatable {
         self.patchMouse = patchMouse
         self.syncGlobal = syncGlobal
         self.shiftScroll = shiftScroll
+        self.normalizeWheel = normalizeWheel
     }
 
     public var isEnabled: Bool { enabled ?? true }
@@ -110,7 +114,8 @@ public struct MGLConfig: Codable, Equatable {
             modifiers: ModifierName.allCases,
             patchMouse: true,
             syncGlobal: false,
-            shiftScroll: .verticalKeepShift
+            shiftScroll: .verticalKeepShift,
+            normalizeWheel: true
         ),
         Profile(
             name: "Everywhere else",
@@ -217,6 +222,7 @@ public struct PatchSettings: Equatable {
     public var patchMouse: Bool
     public var syncGlobal: Bool
     public var shiftScroll: ShiftScrollMode
+    public var normalizeWheel: Bool
 
     public init(profile: Profile) {
         profileName = profile.name
@@ -225,6 +231,7 @@ public struct PatchSettings: Equatable {
         patchMouse = profile.patchMouse ?? true
         syncGlobal = profile.syncGlobal ?? false
         shiftScroll = profile.shiftScroll ?? .system
+        normalizeWheel = profile.normalizeWheel ?? false
     }
 
     /// Command-line overrides applied on top of every profile.

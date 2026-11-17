@@ -66,7 +66,7 @@ Only if A is insufficient (e.g. WoW reads modifiers from a per-device state, or 
 - [x] `scripts/create-signing-identity.sh`: local self-signed code-signing identity → stable designated requirement, so Accessibility survives rebuilds (verified in a throwaway keychain).
 - [ ] Verify on hardware: install, grant Accessibility, WoW switching from the menu-bar app, permission kept after a rebuild, Launch at Login.
 - [x] Menu-bar app verified on hardware: installation OK, side buttons work in WoW.
-- [ ] Shift + wheel up/down in WoW: macOS converts Shift+wheel to horizontal scroll → `shiftScroll` profile option. `vertical` did NOT work in WoW (it drops Shift and WoW reads modifiers from the event) → WoW profile now uses `vertical-keep-shift`. That also failed: the conversion happens AFTER the HID tap, so the axis fix moved to a second, late tap (annotated session). Verify on hardware.
+- [ ] Shift + wheel up/down in WoW: macOS converts Shift+wheel to horizontal scroll → `shiftScroll` profile option. `vertical` did NOT work in WoW (it drops Shift and WoW reads modifiers from the event) → WoW profile now uses `vertical-keep-shift`. Probe `--late` showed the tick is still vertical + Shift at the last tap stage → AppKit converts inside the app → keep-shift now marks the notch as precise (continuous) so AppKit leaves it alone; plus `normalizeWheel` (0.1 per notch → 1). Verify on hardware.
 - [x] Shift + middle click in WoW: works (verified by the user).
 - [ ] App icon (.icns) — cosmetic.
 - ~~LaunchAgent alternative for a headless CLI setup~~ — not needed: the app covers launch at login.

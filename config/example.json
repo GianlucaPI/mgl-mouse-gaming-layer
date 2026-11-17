@@ -14,6 +14,7 @@
         "command"
       ],
       "name" : "World of Warcraft",
+      "normalizeWheel" : true,
       "patchMouse" : true,
       "shiftScroll" : "vertical-keep-shift",
       "syncGlobal" : false

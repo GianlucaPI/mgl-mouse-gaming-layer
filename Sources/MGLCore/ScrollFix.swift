@@ -3,18 +3,18 @@ import Foundation
 
 /// How MGL treats wheel scrolling while Shift is held.
 ///
-/// macOS turns Shift + vertical wheel (non-continuous mice) into a *horizontal* scroll and
-/// keeps Shift in the flags, so games never see "Shift + wheel up/down" (WoW's
-/// SHIFT-MOUSEWHEELUP / DOWN).
+/// AppKit (inside the app, after every event tap) turns Shift + vertical wheel from
+/// non-precise devices into a *horizontal* scroll and keeps Shift, so games never see
+/// "Shift + wheel up/down" (WoW's SHIFT-MOUSEWHEELUP / DOWN). Verified with
+/// `mgl-probe --late`: at the last tap stage the tick is still vertical with Shift.
 public enum ShiftScrollMode: String, Codable, CaseIterable {
     /// Leave it to macOS (horizontal scroll). Right for browsers, editors, Finder.
     case system
-    /// Undo the axis swap and remove Shift from the scroll event, so nothing downstream
-    /// converts it again. Only for games that track Shift themselves (NOT WoW: it reads
-    /// modifiers from the event and then sees a plain wheel).
+    /// Remove Shift from the scroll event (vertical axis), so AppKit does not convert it.
+    /// Only for games that track Shift themselves (NOT WoW: it then sees a plain wheel).
     case vertical
-    /// Undo the axis swap but keep Shift in the event flags. Needed by games that read
-    /// modifiers from the event (World of Warcraft does).
+    /// Keep Shift and the vertical axis, presenting the tick as a precise (pixel) scroll so
+    /// AppKit does not convert it. For games that read modifiers from the event (WoW).
     case verticalKeepShift = "vertical-keep-shift"
 
     /// Tolerant: case, surrounding spaces, "_" / " " / typographic dashes all accepted.
@@ -92,18 +92,71 @@ public struct ScrollAxes: Equatable {
     }
 }
 
-public enum ShiftScroll {
-    /// Computes the fixed axes and flags for a non-continuous wheel event while Shift is held.
-    /// `flags` must already include the held modifiers MGL wants to add.
-    public static func fix(axes: ScrollAxes, flags: CGEventFlags, mode: ShiftScrollMode)
-        -> (axes: ScrollAxes, flags: CGEventFlags)
-    {
-        guard mode != .system else { return (axes, flags) }
-        let newAxes = axes.isHorizontalOnly ? axes.movedToVertical() : axes
-        var newFlags = flags
-        if mode == .vertical {
-            newFlags = CGEventFlags(rawValue: flags.rawValue & ~ModifierName.shift.mask)
+public enum WheelFix {
+    /// Pixels per line used when a wheel tick is presented as a precise (pixel) scroll.
+    public static let pixelsPerLine: Int64 = 10
+
+    public struct Result: Equatable {
+        public var axes: ScrollAxes
+        public var flags: CGEventFlags
+        /// Present the tick as a precise (continuous) scroll, so AppKit does not turn
+        /// Shift + wheel into horizontal scrolling.
+        public var markContinuous: Bool
+    }
+
+    /// Fix for one notched-wheel (non-continuous) scroll event, as seen at the last tap
+    /// stage before apps. Pure function.
+    /// - Parameters:
+    ///   - shiftHeld: Shift is physically held (tracker) or present in the event.
+    ///   - heldShiftBits: Shift bits (incl. left/right) to put back when keeping Shift.
+    ///   - normalize: make every notch worth at least one whole line (fixed-point delta),
+    ///     so games that accumulate `deltaY` react on the first notch.
+    public static func apply(axes: ScrollAxes, flags: CGEventFlags, shiftHeld: Bool, heldShiftBits: UInt64,
+                             mode: ShiftScrollMode, normalize: Bool) -> Result {
+        var a = normalize ? axes.normalized() : axes
+        var f = flags
+        var continuous = false
+        if shiftHeld && mode != .system {
+            if a.isHorizontalOnly { a = a.movedToVertical() }
+            switch mode {
+            case .vertical:
+                f = CGEventFlags(rawValue: f.rawValue & ~ModifierName.shift.mask)
+            case .verticalKeepShift:
+                let bits = heldShiftBits != 0 ? heldShiftBits : CGEventFlags.maskShift.rawValue | ModifierFlags.leftShift
+                f = CGEventFlags(rawValue: f.rawValue | bits)
+                continuous = true
+                a = a.withMinimumPoints(perLine: pixelsPerLine)
+            case .system:
+                break
+            }
         }
-        return (newAxes, newFlags)
+        return Result(axes: a, flags: f, markContinuous: continuous)
+    }
+}
+
+extension ScrollAxes {
+    /// Each axis with a non-zero line delta gets a fixed-point delta of at least that many
+    /// lines (macOS can report e.g. 0.1 per notch). Larger (accelerated) values are kept.
+    public func normalized() -> ScrollAxes {
+        func fix(_ delta: Int64, _ fixed: Double) -> Double {
+            guard delta != 0, abs(fixed) < Double(abs(delta)) else { return fixed }
+            return Double(delta)
+        }
+        var a = self
+        a.fixed1 = fix(delta1, fixed1)
+        a.fixed2 = fix(delta2, fixed2)
+        return a
+    }
+
+    /// Pixel deltas of at least `perLine` px per line (precise scrolls are read in pixels).
+    public func withMinimumPoints(perLine: Int64) -> ScrollAxes {
+        func fix(_ delta: Int64, _ point: Int64) -> Int64 {
+            let want = delta * perLine
+            return abs(point) < abs(want) ? want : point
+        }
+        var a = self
+        a.point1 = fix(delta1, point1)
+        a.point2 = fix(delta2, point2)
+        return a
     }
 }

@@ -13,9 +13,9 @@ public final class ModifierPatcher {
         case patched(type: CGEventType, keyCode: Int, keyboardType: Int,
                      original: CGEventFlags, patched: CGEventFlags)
         case synced(flags: CGEventFlags, keyCode: Int)
-        /// stage: "hid" (first tap) or "late" (after macOS's Shift→horizontal conversion).
-        case shiftScrollFixed(stage: String, before: ScrollAxes, after: ScrollAxes,
-                              original: CGEventFlags, patched: CGEventFlags)
+        /// A notched-wheel tick adjusted at the late stage (Shift handling / normalization).
+        case wheelFixed(before: ScrollAxes, after: ScrollAxes, original: CGEventFlags,
+                        patched: CGEventFlags, precise: Bool)
     }
 
     /// Active settings; nil = inactive (pass-through).
@@ -38,9 +38,10 @@ public final class ModifierPatcher {
     private var tracker = ModifierTracker()
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
-    /// Second tap, at the last stage before apps (annotated session), for scroll events only.
-    /// macOS converts Shift + wheel to horizontal *after* the HID tap, so the axis fix for
-    /// `vertical-keep-shift` has to happen here (DEV_LOG 2026-11-17).
+    /// Second tap, at the last stage before apps (annotated session), for scroll events only:
+    /// it sees the final wheel values (after macOS's scroll processing), which is where the
+    /// wheel fixes belong. AppKit's Shift → horizontal conversion happens later, inside the
+    /// app, so it is avoided by marking the tick as precise (DEV_LOG 2026-11-17).
     private var lateTap: CFMachPort?
     private var lateSource: CFRunLoopSource?
     private var syncPending = false
@@ -140,20 +141,6 @@ public final class ModifierPatcher {
             // A key without the held modifiers means the global state was just reset.
             if settings.syncGlobal && !dryRun { scheduleSync() }
 
-        case .scrollWheel where settings.shiftScroll != .system && shiftScrollApplies(event, settings):
-            let original = event.flags
-            let withHeld = settings.patchMouse ? tracker.patched(original, mask: settings.modifierMask) : original
-            let before = ScrollAxes(event: event)
-            let fixed = ShiftScroll.fix(axes: before, flags: withHeld, mode: settings.shiftScroll)
-            guard fixed.axes != before || fixed.flags != original else { return }
-            if !dryRun {
-                if fixed.axes != before { fixed.axes.write(to: event) }
-                event.flags = fixed.flags
-            }
-            scrollFixCount += 1
-            onActivity(.shiftScrollFixed(stage: "hid", before: before, after: fixed.axes,
-                                         original: original, patched: fixed.flags))
-
         default:  // mouse buttons and scroll
             guard settings.patchMouse else { return }
             if patch(event, type: type, keyCode: -1, keyboardType: -1, mask: settings.modifierMask) {
@@ -162,38 +149,35 @@ public final class ModifierPatcher {
         }
     }
 
-    /// Late stage: the event has been through macOS's Shift → horizontal conversion.
-    /// Move a horizontal-only wheel tick back to the vertical axis; Shift is kept for
-    /// `vertical-keep-shift` (and ensured present), dropped for `vertical`.
+    /// Late stage: final wheel values, right before the app receives the event.
     private func handleLate(_ type: CGEventType, _ event: CGEvent) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             tapRestarts += 1
             if let lateTap { CGEvent.tapEnable(tap: lateTap, enable: true) }
             return
         }
-        guard type == .scrollWheel, let settings, settings.shiftScroll != .system,
-              shiftScrollApplies(event, settings) else { return }
+        guard type == .scrollWheel, let settings,
+              settings.shiftScroll != .system || settings.normalizeWheel,
+              event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0  // notched wheels only
+        else { return }
+
         let before = ScrollAxes(event: event)
-        guard before.isHorizontalOnly else { return }
         let original = event.flags
-        let withShift = CGEventFlags(rawValue: original.rawValue
-            | (tracker.held.rawValue & settings.modifierMask & ModifierName.shift.mask))
-        let fixed = ShiftScroll.fix(axes: before, flags: withShift, mode: settings.shiftScroll)
+        let shiftMask = settings.modifierMask & ModifierName.shift.mask
+        let heldShift = tracker.held.rawValue & shiftMask
+        let result = WheelFix.apply(
+            axes: before, flags: original,
+            shiftHeld: heldShift != 0 || original.contains(.maskShift),
+            heldShiftBits: heldShift, mode: settings.shiftScroll, normalize: settings.normalizeWheel)
+        guard result.axes != before || result.flags != original || result.markContinuous else { return }
         if !dryRun {
-            fixed.axes.write(to: event)
-            event.flags = fixed.flags
+            if result.axes != before { result.axes.write(to: event) }
+            if result.flags != original { event.flags = result.flags }
+            if result.markContinuous { event.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1) }
         }
         scrollFixCount += 1
-        onActivity(.shiftScrollFixed(stage: "late", before: before, after: fixed.axes,
-                                     original: original, patched: fixed.flags))
-    }
-
-    /// Shift is held (per our tracking or the event itself) and the event comes from a
-    /// notched wheel (trackpads / Magic Mouse are continuous and left alone).
-    private func shiftScrollApplies(_ event: CGEvent, _ settings: PatchSettings) -> Bool {
-        guard event.getIntegerValueField(.scrollWheelEventIsContinuous) == 0 else { return false }
-        let shiftHeld = tracker.held.contains(.maskShift) && settings.modifierMask & ModifierName.shift.mask != 0
-        return shiftHeld || event.flags.contains(.maskShift)
+        onActivity(.wheelFixed(before: before, after: result.axes, original: original,
+                               patched: result.flags, precise: result.markContinuous))
     }
 
     /// ORs held modifiers into the event. Returns true if the flags were missing some.

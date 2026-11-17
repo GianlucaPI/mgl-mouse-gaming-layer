@@ -146,7 +146,7 @@ func logTap(_ e: TapKeyEvent) {
         + "held=\(ModifierFlags.describe(tracker.held)) hidState=\(ModifierFlags.describe(e.hidSystemFlags)) "
         + "session=\(ModifierFlags.describe(e.sessionFlags))"
         + (e.isSynthetic ? "  [MGL-SYNTH]" : "") + warn
-        + (e.scroll.map { "  axes: \($0.summary)\(e.scrollIsContinuous ? " continuous" : " wheel")" } ?? "")
+        + (e.scroll.map { "  axes: \($0.summary)\(e.scrollIsContinuous ? " PRECISE" : " wheel")" } ?? "")
         + (e.scroll.map { $0.isHorizontalOnly && held.contains(.maskShift) ? "  <-- SHIFT→HORIZONTAL" : "" } ?? ""))
 
     if e.type == .keyDown {

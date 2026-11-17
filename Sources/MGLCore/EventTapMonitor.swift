@@ -50,7 +50,9 @@ public final class EventTapMonitor {
 
         guard let tap = CGEvent.tapCreate(
             tap: location,
-            place: .headInsertEventTap,
+            // At the late stage, append at the tail so we see events after MGL's own late
+            // tap modified them (= what apps really receive).
+            place: location == .cgAnnotatedSessionEventTap ? .tailAppendEventTap : .headInsertEventTap,
             options: .listenOnly,
             eventsOfInterest: mask,
             callback: { _, type, event, context in
