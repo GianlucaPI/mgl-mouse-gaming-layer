@@ -26,9 +26,16 @@ SHORT_VERSION="${FULL_VERSION%%-*}"
 BUILD_NUMBER="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 APP="build/$APP_NAME.app"
 
-echo "==> Building MGLMenuBar (release)"
-swift build -c release --product MGLMenuBar 2>&1 | grep -v "search path" || true
-BIN="$(swift build -c release --show-bin-path)/MGLMenuBar"
+# Build every product (app + mgl + mgl-probe) so the CLI tools in .build/release
+# always match the installed app.
+echo "==> Building all products (release)"
+BUILD_LOG="$(mktemp)"
+if ! swift build -c release >"$BUILD_LOG" 2>&1; then
+  grep -v "search path" "$BUILD_LOG" >&2; rm -f "$BUILD_LOG"; exit 1
+fi
+grep -v "search path" "$BUILD_LOG" | tail -1; rm -f "$BUILD_LOG"
+BIN_DIR="$(swift build -c release --show-bin-path)"
+BIN="$BIN_DIR/MGLMenuBar"
 [ -x "$BIN" ] || { echo "Build failed: $BIN not found" >&2; exit 1; }
 
 echo "==> Assembling $APP"
@@ -73,6 +80,7 @@ codesign --verify --strict "$APP"
 echo "    $(codesign -dr - "$APP" 2>&1 | grep designated)"
 
 echo "==> Built $APP ($SHORT_VERSION build $BUILD_NUMBER)"
+echo "    CLI tools: $BIN_DIR/mgl, $BIN_DIR/mgl-probe"
 
 if [ "$INSTALL" = 1 ]; then
   DEST="/Applications"

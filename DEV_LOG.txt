@@ -330,3 +330,14 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
   - NEXT (user): rebuild/reinstall, test Shift + wheel in WoW; if it fails,
     `mgl-probe watch --late --steelseries` with MGL running (Shift + wheel
     up/down) and share the output.
+
+[2026-11-17] Build script fix - stale CLI tools
+  - User could not run `mgl-probe watch --late`: "Unknown option --late".
+    Cause: build-app.sh built only the MGLMenuBar product in release, so
+    .build/release/mgl-probe (and mgl) stayed at an old version while the
+    installed app was current.
+  - Fix: build-app.sh now runs a full `swift build -c release` (all products)
+    and prints where the CLI tools are. Release tools rebuilt here; `--late`
+    is available.
+  - NEXT (user): `mgl-probe watch --late --steelseries` with MGL running,
+    Shift + wheel up/down; share the output.
