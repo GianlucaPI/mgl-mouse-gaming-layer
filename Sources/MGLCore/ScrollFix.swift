@@ -1,18 +1,49 @@
 import CoreGraphics
+import Foundation
 
 /// How MGL treats wheel scrolling while Shift is held.
 ///
 /// macOS turns Shift + vertical wheel (non-continuous mice) into a *horizontal* scroll and
 /// keeps Shift in the flags, so games never see "Shift + wheel up/down" (WoW's
-/// SHIFT-MOUSEWHEELUP / DOWN). Games track Shift themselves from flagsChanged events.
+/// SHIFT-MOUSEWHEELUP / DOWN).
 public enum ShiftScrollMode: String, Codable, CaseIterable {
     /// Leave it to macOS (horizontal scroll). Right for browsers, editors, Finder.
     case system
     /// Undo the axis swap and remove Shift from the scroll event, so nothing downstream
-    /// converts it again. The game still knows Shift is held. Recommended for games.
+    /// converts it again. Only for games that track Shift themselves (NOT WoW: it reads
+    /// modifiers from the event and then sees a plain wheel).
     case vertical
-    /// Undo the axis swap but keep Shift in the event flags (fallback if a game needs it).
+    /// Undo the axis swap but keep Shift in the event flags. Needed by games that read
+    /// modifiers from the event (World of Warcraft does).
     case verticalKeepShift = "vertical-keep-shift"
+
+    /// Tolerant: case, surrounding spaces, "_" / " " / typographic dashes all accepted.
+    public init?(name: String) {
+        guard let mode = ShiftScrollMode(rawValue: ConfigText.normalized(name)) else { return nil }
+        self = mode
+    }
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        guard let mode = ShiftScrollMode(name: raw) else {
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: decoder.codingPath,
+                debugDescription: "Unknown value \"\(raw)\" (use "
+                    + Self.allCases.map { "\"\($0.rawValue)\"" }.joined(separator: ", ") + ")"))
+        }
+        self = mode
+    }
+}
+
+/// Normalization for enum-like config strings typed by hand.
+public enum ConfigText {
+    public static func normalized(_ text: String) -> String {
+        var s = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        for dash in ["_", " ", "\u{2010}", "\u{2011}", "\u{2012}", "\u{2013}", "\u{2014}", "\u{2212}"] {
+            s = s.replacingOccurrences(of: dash, with: "-")
+        }
+        return s
+    }
 }
 
 /// The delta fields of a scroll-wheel event (axis 1 = vertical, axis 2 = horizontal).

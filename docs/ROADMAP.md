@@ -66,7 +66,7 @@ Only if A is insufficient (e.g. WoW reads modifiers from a per-device state, or 
 - [x] `scripts/create-signing-identity.sh`: local self-signed code-signing identity → stable designated requirement, so Accessibility survives rebuilds (verified in a throwaway keychain).
 - [ ] Verify on hardware: install, grant Accessibility, WoW switching from the menu-bar app, permission kept after a rebuild, Launch at Login.
 - [x] Menu-bar app verified on hardware: installation OK, side buttons work in WoW.
-- [ ] Shift + wheel up/down in WoW: macOS converts Shift+wheel to horizontal scroll → `shiftScroll` profile option (`vertical` in the WoW profile). Verify on hardware.
+- [ ] Shift + wheel up/down in WoW: macOS converts Shift+wheel to horizontal scroll → `shiftScroll` profile option. `vertical` did NOT work in WoW (it drops Shift and WoW reads modifiers from the event) → WoW profile now uses `vertical-keep-shift`. Verify on hardware.
 - [ ] Shift + middle click in WoW: reported not working; probe now logs button numbers → diagnose with `mgl-probe watch --session --steelseries`.
 - [ ] App icon (.icns) — cosmetic.
 - ~~LaunchAgent alternative for a headless CLI setup~~ — not needed: the app covers launch at login.

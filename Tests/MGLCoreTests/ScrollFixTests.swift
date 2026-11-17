@@ -54,8 +54,29 @@ import Testing
         let c = try MGLConfig.decode(Data(json.utf8))
         #expect(PatchSettings(profile: c.profiles[0]).shiftScroll == .verticalKeepShift)
         #expect(PatchSettings(profile: Profile(name: "D")).shiftScroll == .system)
-        #expect(MGLConfig.example.profiles[0].shiftScroll == .vertical)
+        #expect(MGLConfig.example.profiles[0].shiftScroll == .verticalKeepShift)
         let bad = #"{"version":1,"profiles":[{"name":"P","shiftScroll":"sideways"}]}"#
         #expect(throws: ConfigError.self) { try MGLConfig.decode(Data(bad.utf8)) }
+    }
+
+    @Test func tolerantShiftScrollNames() {
+        #expect(ShiftScrollMode(name: "Vertical-Keep-Shift") == .verticalKeepShift)
+        #expect(ShiftScrollMode(name: " vertical_keep_shift ") == .verticalKeepShift)
+        #expect(ShiftScrollMode(name: "vertical keep shift") == .verticalKeepShift)
+        #expect(ShiftScrollMode(name: "vertical\u{2013}keep\u{2013}shift") == .verticalKeepShift)
+        #expect(ShiftScrollMode(name: "verticavertical-keep-shift") == nil)
+    }
+
+    @Test func errorNamesTheBadValueAndTheValidOnes() {
+        let bad = #"{"version":1,"profiles":[{"name":"P","shiftScroll":"verticavertical-keep-shift"}]}"#
+        do {
+            _ = try MGLConfig.decode(Data(bad.utf8))
+            Issue.record("expected an error")
+        } catch {
+            let text = "\(error)"
+            #expect(text.contains("profiles[0].shiftScroll"))
+            #expect(text.contains("verticavertical-keep-shift"))
+            #expect(text.contains("vertical-keep-shift"))
+        }
     }
 }

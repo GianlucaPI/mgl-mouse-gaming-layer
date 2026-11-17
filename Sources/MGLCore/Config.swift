@@ -16,7 +16,7 @@ public enum ModifierName: String, Codable, CaseIterable {
     }
 
     public init?(name: String) {
-        switch name.lowercased() {
+        switch ConfigText.normalized(name) {
         case "shift": self = .shift
         case "control", "ctrl": self = .control
         case "option", "opt", "alt": self = .option
@@ -110,7 +110,7 @@ public struct MGLConfig: Codable, Equatable {
             modifiers: ModifierName.allCases,
             patchMouse: true,
             syncGlobal: false,
-            shiftScroll: .vertical
+            shiftScroll: .verticalKeepShift
         ),
         Profile(
             name: "Everywhere else",

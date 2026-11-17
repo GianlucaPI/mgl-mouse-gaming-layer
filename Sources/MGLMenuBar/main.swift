@@ -117,7 +117,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if let error = status.configError {
             menu.addItem(disabledItem("⚠️ Config error (previous config kept):"))
-            menu.addItem(disabledItem("   " + String(error.prefix(80))))
+            let message = error.hasPrefix("Invalid config: ") ? String(error.dropFirst(16)) : error
+            for line in Self.wrap(message, width: 60) { menu.addItem(disabledItem("   " + line)) }
         }
         menu.addItem(.separator())
 
@@ -157,6 +158,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item("Open Accessibility Settings…", #selector(openAccessibilitySettings)))
         menu.addItem(.separator())
         menu.addItem(item("Quit MGL", #selector(quit), key: "q"))
+    }
+
+    /// Word-wraps long text into menu-sized lines (menus do not wrap by themselves).
+    static func wrap(_ text: String, width: Int) -> [String] {
+        var lines: [String] = []
+        var current = ""
+        for word in text.split(separator: " ", omittingEmptySubsequences: false) {
+            if !current.isEmpty && current.count + 1 + word.count > width {
+                lines.append(current)
+                current = ""
+            }
+            current += (current.isEmpty ? "" : " ") + word
+            while current.count > width {  // a single very long word
+                lines.append(String(current.prefix(width)))
+                current = String(current.dropFirst(width))
+            }
+        }
+        if !current.isEmpty { lines.append(current) }
+        return lines
     }
 
     private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {

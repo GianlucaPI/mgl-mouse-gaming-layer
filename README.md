@@ -91,7 +91,7 @@ swift build -c release
       "apps": ["com.blizzard.worldofwarcraft", "Wow", "World of Warcraft"],
       "modifiers": ["shift", "control", "option", "command"],
       "patchMouse": true,
-      "shiftScroll": "vertical",
+      "shiftScroll": "vertical-keep-shift",
       "syncGlobal": false
     },
     { "name": "Everywhere else", "enabled": false, "apps": [] }
@@ -108,7 +108,7 @@ swift build -c release
 | `keyboardTypes` | Only patch key events from these keyboard types (Aerox 9 over BLE = `40`) | any |
 | `patchMouse` | Patch mouse clicks / scroll | `true` |
 | `syncGlobal` | Restore macOS's global modifier state (experimental) | `false` |
-| `shiftScroll` | Shift + mouse wheel: `system` (macOS turns it into horizontal scroll), `vertical` (keep it vertical and drop Shift from the scroll event — games still see Shift held; needed for WoW `SHIFT-MOUSEWHEELUP/DOWN`), `vertical-keep-shift` (keep vertical, keep Shift in the event) | `system` |
+| `shiftScroll` | Shift + mouse wheel: `system` (macOS turns it into horizontal scroll), `vertical-keep-shift` (keep it vertical with Shift — for WoW `SHIFT-MOUSEWHEELUP/DOWN`), `vertical` (keep it vertical and drop Shift from the scroll event — only for games that track Shift themselves). Case, spaces and `_` are tolerated | `system` |
 
 **Resolution:** the first enabled profile whose `apps` contains the frontmost app wins; otherwise the first enabled catch-all profile; otherwise mgl is inactive (events pass through untouched). MGL switches profile instantly when you change app. Use `mgl-probe apps` to discover an app's name and bundle ID.
 

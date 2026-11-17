@@ -278,3 +278,29 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     WoW; if still failing try "vertical-keep-shift". Run
     `mgl-probe watch --session --steelseries` while pressing Shift + wheel /
     Shift + middle click (with MGL running) and share the output.
+
+[2026-11-17] Phase 5 - shiftScroll follow-up: "vertical" fails in WoW, config typo UX
+  - User report: with "shiftScroll": "vertical", Shift + wheel still does not
+    work in WoW. Switching the value by hand produced a menu error truncated
+    at 80 chars: "...Cannot initialize ShiftScrollMode from" (value cut off).
+  - Cause of the error: the file contained "verticavertical-keep-shift"
+    (editing leftover). Fixed the user's config to "vertical-keep-shift".
+  - Analysis of "vertical" failing: Phase 2 showed WoW takes modifiers from
+    the EVENT flags (patching flags fixed side buttons while the global state
+    was empty). "vertical" strips Shift from the scroll event, so WoW sees a
+    plain wheel. => WoW needs "vertical-keep-shift" (vertical axes + Shift).
+    The example WoW profile now uses it; "vertical" is documented as only for
+    games that track Shift themselves.
+    Open question: if macOS converts in AppKit (after our tap, based on the
+    flags) rather than before the tap, keep-shift will be re-converted -> the
+    probe (HID level with MGL paused, then --session with MGL on) will tell.
+  - Config UX:
+      * ShiftScrollMode and ModifierName parsing tolerate case, spaces, "_",
+        and typographic dashes (ConfigText.normalized);
+      * error now names the bad value and the valid ones:
+        '.profiles[0].shiftScroll: Unknown value "verticavertical-keep-shift"
+         (use "system", "vertical", "vertical-keep-shift")';
+      * menu shows the whole error word-wrapped at 60 chars, not cut at 80.
+  - Tests: 35 passing.
+  - NEXT (user): rebuild/reinstall, test Shift + wheel in WoW with
+    vertical-keep-shift; probe output for wheel + middle click if it fails.
