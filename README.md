@@ -144,7 +144,15 @@ Verified so far (BLE): Shift + side button in TextEdit, World of Warcraft (keybi
 
 ## Fair-play note
 
-MGL performs **1:1 input remapping** (one physical press → one keystroke with modifiers). It does not implement macros, timed sequences or automation, which keeps it in line with Blizzard's rules on input software. Do not extend it in that direction.
+MGL performs **1:1 input remapping** (one physical press → one keystroke with modifiers). It does not implement macros, timed sequences or automation, and it does not read or modify any game memory or files. Do not extend it in that direction.
+
+## Disclaimer
+
+MGL is an independent, unofficial project provided "as is", without warranty of any kind (see [LICENSE](LICENSE)). **Use it at your own risk.** Whether third-party input software is acceptable is decided by each game's publisher and its terms of service; the authors cannot guarantee that using MGL complies with them, and are not responsible for any consequence on your game accounts.
+
+## Trademarks
+
+World of Warcraft and Blizzard Entertainment are trademarks or registered trademarks of Blizzard Entertainment, Inc. SteelSeries and Aerox are trademarks of SteelSeries ApS. macOS is a trademark of Apple Inc. All other trademarks are the property of their respective owners. They are used here only to describe compatibility. **This project is not affiliated with, endorsed by, or sponsored by Blizzard Entertainment, SteelSeries or Apple.**
 
 ## Uninstall
 

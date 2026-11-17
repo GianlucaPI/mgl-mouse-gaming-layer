@@ -449,3 +449,13 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     backups.
   - Verified: release build, 39 tests, ad-hoc MGL.app 0.1.0 build with icon.
   - Git tag v0.1.0 created locally (push with --follow-tags).
+
+[2026-11-17] README: disclaimer and trademarks
+  - Name decision: keep "MGL" (suggested a more searchable GitHub repo name,
+    e.g. mgl-macos, plus description/topics).
+  - README: fair-play note now also states MGL does not read/modify game
+    memory or files; new "Disclaimer" (as-is, use at your own risk, ToS are
+    the publisher's call) and "Trademarks" (Blizzard/WoW, SteelSeries/Aerox,
+    Apple/macOS; descriptive use only; not affiliated/endorsed) sections.
+  - Tag v0.1.0 moved to this commit (not pushed yet) so the release includes
+    the disclaimer.
