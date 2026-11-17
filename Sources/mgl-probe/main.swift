@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 import MGLCore
@@ -21,6 +22,8 @@ COMMANDS
   hid       Log raw HID input values (keyboard, button, consumer pages)
   tap       Log key events, mouse clicks and scroll from a listen-only CGEventTap
   watch     hid + tap interleaved on one timeline (default)
+  appkit    Offline self-test: how AppKit turns scroll events into what apps read
+            (Shift + wheel → horizontal, precise vs notched). Posts nothing.
 
 OPTIONS
   --vendor <hex>   Only HID devices with this vendor ID (e.g. 0x1038)
@@ -32,7 +35,8 @@ OPTIONS
   --late           tap/watch: tap at the last stage before apps (annotated session):
                    shows what apps really receive, e.g. Shift+wheel turned horizontal
 
-Press Ctrl-C to stop; a summary is printed on exit.
+Press Ctrl-C to stop; a summary is printed on exit. If Ctrl-C does not reach the
+probe (e.g. the terminal is not focused), stop it with `pkill mgl-probe`.
 Tip: pipe to a file with `| tee probe.log`.
 """
 
@@ -144,7 +148,7 @@ func logTap(_ e: TapKeyEvent) {
         + "flags=\(ModifierFlags.describeHex(e.flags))  kbType=\(e.keyboardType) "
         + "srcState=\(e.sourceStateID) pid=\(e.sourcePID)\(e.isAutorepeat ? " REPEAT" : "")  "
         + "held=\(ModifierFlags.describe(tracker.held)) hidState=\(ModifierFlags.describe(e.hidSystemFlags)) "
-        + "session=\(ModifierFlags.describe(e.sessionFlags))"
+        + "session=\(ModifierFlags.describe(e.sessionFlags)) keys=\(physicalModifierKeys())"
         + (e.isSynthetic ? "  [MGL-SYNTH]" : "") + warn
         + (e.scroll.map { "  axes: \($0.summary)\(e.scrollIsContinuous ? " PRECISE" : " wheel")" } ?? "")
         + (e.scroll.map { $0.isHorizontalOnly && held.contains(.maskShift) ? "  <-- SHIFT→HORIZONTAL" : "" } ?? ""))
@@ -155,6 +159,46 @@ func logTap(_ e: TapKeyEvent) {
     }
     if e.isMouse && !missing.isEmpty { summary.mouseDownsWithoutHeldModifiers += 1 }
     if e.isSynthetic { summary.syntheticEvents += 1 }
+}
+
+/// Modifier keys reported DOWN by CGEventSourceKeyState (per-key state, independent of the
+/// modifier-flag state that the mouse's reports reset). Used to evaluate a stale-modifier guard.
+func physicalModifierKeys() -> String {
+    let keys: [(CGKeyCode, String)] = [(56, "LShift"), (60, "RShift"), (59, "LCtrl"), (62, "RCtrl"),
+                                       (58, "LOpt"), (61, "ROpt"), (55, "LCmd"), (54, "RCmd")]
+    let down = keys.filter { CGEventSource.keyState(.hidSystemState, key: $0.0) }.map(\.1)
+    return "[" + down.joined(separator: " ") + "]"
+}
+
+func runAppKitSelfTest() {
+    _ = NSApplication.shared
+    func make(_ d1: Int32, _ d2: Int32, fixed1: Double, fixed2: Double, px1: Int64, px2: Int64,
+              shift: Bool, precise: Bool) -> CGEvent? {
+        guard let e = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 2,
+                              wheel1: d1, wheel2: d2, wheel3: 0) else { return nil }
+        e.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: fixed1)
+        e.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: fixed2)
+        e.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: px1)
+        e.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: px2)
+        e.setIntegerValueField(.scrollWheelEventIsContinuous, value: precise ? 1 : 0)
+        e.flags = CGEventFlags(rawValue: shift ? 0x20102 : 0x100)
+        return e
+    }
+    let cases: [(String, CGEvent?)] = [
+        ("Aerox notch up, no Shift      ", make(1, 0, fixed1: 0.1, fixed2: 0, px1: 1, px2: 0, shift: false, precise: false)),
+        ("Aerox notch up, Shift         ", make(1, 0, fixed1: 0.1, fixed2: 0, px1: 1, px2: 0, shift: true, precise: false)),
+        ("normalized notch, Shift       ", make(1, 0, fixed1: 1, fixed2: 0, px1: 10, px2: 0, shift: true, precise: false)),
+        ("horizontal-only notch, Shift  ", make(0, 1, fixed1: 0, fixed2: 1, px1: 0, px2: 10, shift: true, precise: false)),
+        ("precise notch, Shift (keep)   ", make(1, 0, fixed1: 1, fixed2: 0, px1: 10, px2: 0, shift: true, precise: true)),
+        ("notch, Shift stripped (vert.) ", make(1, 0, fixed1: 1, fixed2: 0, px1: 10, px2: 0, shift: false, precise: false)),
+    ]
+    print("What an app reads from NSEvent for each scroll event (nothing is posted):\n")
+    for (name, cg) in cases {
+        guard let cg, let ns = NSEvent(cgEvent: cg) else { print("\(name) -> (could not build)"); continue }
+        print("\(name) -> deltaY=\(ns.deltaY) deltaX=\(ns.deltaX)  scrollingDeltaY=\(ns.scrollingDeltaY) "
+            + "scrollingDeltaX=\(ns.scrollingDeltaX)  precise=\(ns.hasPreciseScrollingDeltas) "
+            + "shift=\(ns.modifierFlags.contains(.shift))")
+    }
 }
 
 func mouseDetail(_ e: TapKeyEvent) -> String {
@@ -221,16 +265,18 @@ func startTap() {
 }
 
 func installSigintSummary() {
-    signal(SIGINT, SIG_IGN)
-    let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
-    source.setEventHandler {
-        summary.print()
-        exit(0)
+    for sig in [SIGINT, SIGTERM] {
+        signal(sig, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+        source.setEventHandler {
+            summary.print()
+            exit(0)
+        }
+        source.resume()
+        signalSources.append(source)
     }
-    source.resume()
-    sigintSource = source
 }
-var sigintSource: DispatchSourceSignal?
+var signalSources: [DispatchSourceSignal] = []
 
 switch command {
 case "list":
@@ -244,6 +290,8 @@ case "apps":
     CFRunLoopRun()
 case "perms":
     runPerms()
+case "appkit":
+    runAppKitSelfTest()
 case "hid", "tap", "watch":
     print(Permissions.report())
     print("""

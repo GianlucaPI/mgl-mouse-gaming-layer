@@ -372,3 +372,40 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     pixels). If so: tune pixelsPerLine or try "vertical".
   - NEXT (user): build-app.sh --install; test wheel (1 notch) and Shift +
     wheel in WoW; if needed, `mgl-probe watch --late --steelseries` output.
+
+[2026-11-17] Wheel follow-up: normalize verified; AppKit self-test; two layers running
+  - User report: single wheel notch now WORKS in WoW (normalizeWheel). Shift +
+    wheel up still does NOT. After Shift + wheel down in Terminal, Ctrl-C did
+    not stop mgl-probe. The pasted probe output mixes the previous run (same
+    timestamps) with a new one; it shows no PRECISE/normalized ticks.
+  - Offline AppKit test (NSEvent(cgEvent:) on synthetic CGEvents, nothing
+    posted; now `mgl-probe appkit`):
+        Aerox notch, no Shift      -> deltaY=0.0999  (=> "needs ~3 notches")
+        notch + Shift              -> deltaX=1, deltaY=0 (horizontal)
+        horizontal-only + Shift    -> deltaX=1 (AppKit does NOT swap back)
+        precise notch + Shift      -> deltaY=1, scrollingDeltaY=10, shift=true
+        notch, Shift stripped      -> deltaY=1, shift=false
+    => keep-shift (precise) does what we wanted at AppKit level, so WoW must
+       ignore / treat precise scrolls differently. Only other option left:
+       "vertical" (strip Shift at the late stage) - works if WoW reads Shift
+       from its own/global state for wheel bindings.
+  - The earlier "vertical" test was INVALID: Shift was stripped at the HID
+    tap, but scroll flags at the late stage are 0x20002 (no 0x100 device bit),
+    i.e. the WindowServer recomputes scroll flags from the global state and
+    put Shift back. "vertical" now strips at the late stage -> must be re-tested.
+  - Found on the user's Mac:
+      * the app's UserDefaults had forcedProfile = "World of Warcraft" (menu
+        Profile submenu) => MGL active everywhere, including Terminal;
+      * a leftover CLI `mgl` (old build, PID 39775) still running next to
+        MGL.app => two layers at once. Stopping it was not permitted from
+        here; the user stops it.
+    Both can explain odd behavior in Terminal (Ctrl-C). Possible mechanism to
+    watch: a modifier stuck in a tracker (e.g. release missed during Secure
+    Keyboard Entry) would add that modifier to every key. mgl-probe now prints
+    keys=[...] (CGEventSourceKeyState per modifier key) to evaluate a
+    stale-modifier guard.
+  - mgl-probe: `appkit` command, keys= column, SIGTERM handled (pkill hint).
+  - Tests: 39 passing.
+  - NEXT (user): stop the CLI mgl, Profile -> Automatic, set shiftScroll to
+    "vertical", test Shift + wheel in WoW. If Ctrl-C issue reappears, send
+    probe output including the keys= column.

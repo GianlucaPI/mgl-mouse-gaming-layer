@@ -131,7 +131,7 @@ Config commands: `mgl config init [--force]`, `mgl config path`, `mgl config sho
 
 Verified so far (BLE): Shift + side button in TextEdit, World of Warcraft (keybinds and `[mod:shift]` macros) and macOS system apps; Shift-click right after a side button keeps Shift.
 
-`mgl-probe` commands: `list`, `perms`, `apps`, `hid`, `tap`, `watch` (default). Options: `--steelseries`, `--vendor <hex>`, `--all-pages`, `--raw`, `--session`, `--late`. Run `mgl-probe help` for details.
+`mgl-probe` commands: `list`, `perms`, `apps`, `hid`, `tap`, `watch` (default), `appkit` (offline self-test of how AppKit converts scroll events). Options: `--steelseries`, `--vendor <hex>`, `--all-pages`, `--raw`, `--session`, `--late`. Run `mgl-probe help` for details.
 
 > Permissions are granted to the **terminal app** you run it from (Terminal, iTerm…): add it under System Settings → Privacy & Security → **Input Monitoring** (for `mgl-probe`) and **Accessibility** (for `mgl`), then restart the terminal.
 
