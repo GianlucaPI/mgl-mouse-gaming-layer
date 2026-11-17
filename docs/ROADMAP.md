@@ -8,14 +8,15 @@ Stack: **Swift + SwiftPM** (no Xcode required until Phase 5), Apple frameworks o
 
 ## Phase 0 — Repository & groundwork ✅
 - [x] Git repo, README (EN), ROADMAP, DEV_LOG.txt, .gitignore
-- [ ] SwiftPM package skeleton (`MGLCore` library, `mgl-probe` and `mgl` executables, test target)
+- [x] SwiftPM package skeleton (`MGLCore` library, `mgl-probe` and `mgl` executables, test target)
 - [ ] Decide license
 
-## Phase 1 — Diagnosis (`mgl-probe`)
-Confirm the exact root cause before writing the fix.
-- [ ] **HID enumeration**: list all HID devices with VendorID/ProductID/usage page. Identify the Aerox 9 (SteelSeries VID `0x1038`) interfaces: mouse, keyboard-like, vendor-specific. Note wired vs 2.4 GHz dongle vs Bluetooth (different PIDs).
-- [ ] **Raw HID log**: with `IOHIDManager`, print the key usages the mouse emits for each of the 12 side buttons (and whether it sends a modifier byte = 0 on every report).
-- [ ] **Event-tap log**: with a listen-only `CGEventTap`, print for every keyDown/keyUp/flagsChanged: keycode, `flags`, `kCGKeyboardEventKeyboardType`, source state ID, timestamp.
+## Phase 1 — Diagnosis (`mgl-probe`) 🚧
+Confirm the exact root cause before writing the fix. Tooling is done; the in-game test session is pending.
+- [x] **HID enumeration**: list all HID devices with VendorID/ProductID/usage page. Identify the Aerox 9 (SteelSeries VID `0x1038`) interfaces: mouse, keyboard-like, vendor-specific. Note wired vs 2.4 GHz dongle vs Bluetooth (different PIDs).
+- [x] **Raw HID log**: with `IOHIDManager`, print the key usages the mouse emits for each of the 12 side buttons (and whether it sends a modifier byte = 0 on every report).
+- [x] **Event-tap log**: with a listen-only `CGEventTap`, print for every keyDown/keyUp/flagsChanged: keycode, `flags`, `kCGKeyboardEventKeyboardType`, source state ID, timestamp.
+- [x] Summary on exit (presses per device, keyboardType stats, count of keyDowns missing a held modifier)
 - [ ] Test matrix: hold Shift / Option / Ctrl on the keyboard + press side buttons → record what arrives. Also test in TextEdit and in WoW.
 - [ ] Write findings in DEV_LOG.txt → choose strategy A or B below.
 
@@ -34,6 +35,7 @@ The simplest approach; try first.
 
 ## Phase 3 — Strategy B (fallback / robustness): seize & re-emit
 Only if A is insufficient (e.g. WoW reads modifiers from a per-device state, or flags patching is ignored).
+> ⚠️ Finding (2026-11-17): over Bluetooth LE the Aerox 9 exposes **one** HID interface carrying Mouse + Keyboard + Consumer + vendor collections. Seizing it would also swallow pointer movement and clicks, which would then have to be re-emitted too. Strategy A is strongly preferred; B is more viable over the 2.4 GHz dongle / USB if those expose a separate keyboard interface.
 - [ ] Open the Aerox 9 keyboard interface with `IOHIDManager` using `kIOHIDOptionsTypeSeizeDevice` so macOS no longer sees its keystrokes.
 - [ ] For each HID key usage from the mouse, synthesize a new `CGEvent` (keyDown/keyUp) with the current global modifier flags (`CGEventSourceFlagsState(.hidSystemState)` + own tracking) and post it.
 - [ ] Map HID usage → macOS virtual keycode (table in `MGLCore`).

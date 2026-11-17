@@ -15,3 +15,37 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
   - Chosen plan: diagnose first (mgl-probe), then MVP with a flag-patching
     CGEventTap (Strategy A); fall back to IOHIDManager seize + re-emit (Strategy B).
   - NEXT: SwiftPM skeleton + mgl-probe (HID enumeration, raw HID log, event-tap log).
+
+[2026-11-17] Phase 0/1 - SwiftPM skeleton + mgl-probe diagnostic tool
+  - Package.swift (tools 5.9, macOS 13+): library MGLCore, executables
+    mgl-probe and mgl (stub), test target MGLCoreTests (swift-testing).
+  - MGLCore:
+      HIDDevices.swift      device enumeration (VID/PID, transport, usage pairs)
+      HIDValueMonitor.swift non-exclusive IOHIDManager input value logger
+      EventTapMonitor.swift listen-only CGEventTap (keyDown/keyUp/flagsChanged),
+                            records flags, keyboardType, source state/pid and the
+                            global modifier state (hidSystemState / combinedSession)
+      ModifierFlags.swift   CGEventFlags decoding incl. left/right device bits
+                            and "orphan" device bits
+      KeyNames.swift        HID usage (page 0x07) + macOS virtual keycode names
+      Permissions.swift     Input Monitoring / Accessibility checks
+  - mgl-probe commands: list, perms, hid, tap, watch (default). watch interleaves
+    HID values and tap events on one clock and flags every keyDown that lacks
+    a modifier which is globally held ("<-- MISSING"). Ctrl-C prints a summary.
+  - Tests: 7 passing. Command Line Tools only => `swift test` cannot find the
+    swift-testing macro plugin; scripts/test.sh passes -plugin-path explicitly.
+  - Build warnings "search path ... not found" from ld are harmless (CLT only).
+  - FINDING: `mgl-probe list` shows the mouse as
+        "Aerox 9 WL" VID:PID 0x0111:0x185A, transport Bluetooth Low Energy,
+        ONE interface with Mouse + Pointer + Keyboard + ConsumerControl +
+        vendor pages 0xFFC0/0xFFC1.
+    -> Over BLE the vendor ID is 0x0111 (Bluetooth company ID), not 0x1038.
+       --steelseries now matches both.
+    -> Seizing the device (Strategy B) would also capture pointer motion and
+       clicks. Strategy A (flag-patching tap) is the preferred path.
+  - Smoke test: watch starts and exits cleanly with summary. Real button tests
+    NOT done yet (need the user at the mouse + Input Monitoring for the terminal).
+  - NEXT: user runs the test protocol (`mgl-probe watch --steelseries` in
+    Terminal, then `mgl-probe watch` without filter for Shift on the keyboard
+    + side buttons, also inside WoW), shares probe.log -> decide Phase 2 design.
+    Also worth comparing BLE vs 2.4 GHz dongle.

@@ -2,7 +2,7 @@
 
 A lightweight macOS input layer that makes **keyboard modifiers (Shift, Option, Control, Command)** work together with the side buttons of gaming mice that emit keyboard keystrokes — built first and foremost for the **SteelSeries Aerox 9 (12 side buttons)** and **World of Warcraft** on Apple Silicon.
 
-> Status: **planning / pre-alpha**. See [docs/ROADMAP.md](docs/ROADMAP.md) and [DEV_LOG.txt](DEV_LOG.txt).
+> Status: **pre-alpha — Phase 1 (diagnostics) tooling ready**. See [docs/ROADMAP.md](docs/ROADMAP.md) and [DEV_LOG.txt](DEV_LOG.txt).
 
 ## The problem
 
@@ -26,29 +26,37 @@ Optionally it can also remap the side buttons to arbitrary keys and only be acti
 - Swift 5.9+ toolchain (Command Line Tools are enough for the CLI; full Xcode only needed later for the menu-bar app bundle)
 - Permissions: **Accessibility** and **Input Monitoring** (System Settings → Privacy & Security)
 
-## Project layout (planned)
+## Project layout
 
 ```
 MGL_mouse_gaming_layer/
 ├── Package.swift
 ├── Sources/
-│   ├── MGLCore/        # event tap, modifier merging, device detection, config
+│   ├── MGLCore/        # HID enumeration/monitoring, event tap, key & modifier tables
 │   ├── mgl-probe/      # diagnostic CLI: lists HID devices, logs raw events
-│   └── mgl/            # the layer daemon (CLI first, menu-bar app later)
+│   └── mgl/            # the layer daemon (stub until Phase 2)
 ├── Tests/MGLCoreTests/
-├── config/example.json
+├── scripts/test.sh
 ├── docs/ROADMAP.md
 ├── DEV_LOG.txt
 └── README.md
 ```
 
-## Build & run (once Phase 1 lands)
+## Build & run
 
 ```bash
 swift build -c release
-.build/release/mgl-probe        # diagnostics
-.build/release/mgl              # start the layer
+./scripts/test.sh                                   # unit tests
+.build/release/mgl-probe list --steelseries         # find the mouse's HID interfaces
+.build/release/mgl-probe perms                      # check / request permissions
+.build/release/mgl-probe watch | tee probe.log      # HID + event-tap log, Ctrl-C for summary
 ```
+
+`mgl-probe` commands: `list`, `perms`, `hid`, `tap`, `watch` (default). Options: `--steelseries`, `--vendor <hex>`, `--all-pages`, `--raw`, `--session`. Run `mgl-probe help` for details.
+
+> Permissions are granted to the **terminal app** you run it from (Terminal, iTerm…): add it under System Settings → Privacy & Security → **Input Monitoring**, then restart the terminal.
+
+> With Command Line Tools only (no Xcode), use `./scripts/test.sh` instead of `swift test`: it passes the swift-testing macro plugin path that SwiftPM does not find on its own.
 
 ## Fair-play note
 
