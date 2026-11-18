@@ -1,55 +1,53 @@
 # MGL — Mouse Gaming Layer
 
-A lightweight macOS input layer that makes **keyboard modifiers (Shift, Option, Control, Command)** work together with the side buttons of gaming mice that emit keyboard keystrokes — built first and foremost for the **SteelSeries Aerox 9 (12 side buttons)** and **World of Warcraft** on Apple Silicon.
+**Hold Shift (or Option / Control / Command) on your keyboard, press a side button of your gaming mouse — and on macOS the game gets the plain key instead of the combination. MGL fixes that.**
 
-> Status: **alpha — working in World of Warcraft; Phase 5 menu-bar app implemented**. See [docs/ROADMAP.md](docs/ROADMAP.md), [DEV_LOG.txt](DEV_LOG.txt) and **[docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)**.
+A small menu-bar app for macOS. Built for the **SteelSeries Aerox 9** (12 side buttons) and **World of Warcraft**, on Apple Silicon.
 
-> ⚠️ **Known issue:** Shift + mouse wheel bindings (`SHIFT-MOUSEWHEELUP/DOWN`) do not work in WoW — macOS/AppKit turns them into horizontal scrolling inside the game. Details, evidence and workarounds in [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md#1-shift--mouse-wheel-does-not-trigger-wow-bindings-shift-mousewheelup--shift-mousewheeldown).
+## Is this your problem?
 
-## The problem
+You probably need MGL if **all** of these are true:
 
-The Aerox 9 side buttons are mapped (in the mouse's onboard memory) to keyboard keys such as `1`–`=`. The mouse therefore enumerates on macOS as an additional **HID keyboard**.
+- you play on a **Mac**;
+- your mouse's side buttons are assigned to **keyboard keys** (e.g. `1`, `2`, `3`… or `Q`, `E`…), typical of MMO mice;
+- **`Shift` + side button** (or `Alt`/`Ctrl` + side button) does **not** trigger your `Shift`-bindings in the game — the game reacts as if you had pressed the side button alone.
 
-When you hold `Shift` on your real keyboard and press a side button, the game receives the plain key (`1`) instead of `Shift+1`. On macOS, keyboard events carry modifier flags tied to the device that produced them, so a keystroke coming from the "mouse keyboard" arrives without the modifiers you are holding on the other device. Diagnostics showed that even macOS's *global* modifier state reads "no modifiers" at that moment. SteelSeries GG for macOS does not offer a workaround.
+| You do | Without MGL the game receives | With MGL the game receives |
+|---|---|---|
+| hold `Shift` + press side button mapped to `1` | `1` | `Shift+1` ✅ |
+| hold `Alt` + press side button mapped to `2` | `2` | `Alt+2` ✅ |
+| hold `Shift`, press a side button, then click | click (Shift lost) | `Shift`+click ✅ |
+| turn the wheel by one notch | often nothing (needs ~3 notches) | one wheel step ✅ (`normalizeWheel`) |
 
-## The idea
+Your keyboard, the mouse buttons themselves and every other app keep working exactly as before. MGL can be active **only while the game is in the foreground**.
 
-MGL sits between the hardware and the game:
+> **Verified with:** SteelSeries Aerox 9 Wireless over Bluetooth, World of Warcraft, macOS on a MacBook Pro M1 Pro. Other mice whose side buttons send keyboard keys (Razer Naga, Logitech G600, Corsair Scimitar, the Aerox 9 over its 2.4 GHz dongle…) may have the same problem and should work, but are **not tested yet** — reports welcome.
 
-1. An active `CGEventTap` tracks, from `flagsChanged` events, which modifiers are held on each keyboard (MGL keeps its own state because the system one is unreliable here).
-2. Every keyDown/keyUp that arrives without those modifiers (e.g. from the mouse) gets them added to its flags. Mouse clicks and scroll events are patched the same way, because after a side-button press macOS's global modifier state reads empty and a following Shift-click would otherwise lose Shift.
-3. The game sees `Shift+1`, `Opt+1`, `Ctrl+1`, …
-4. A second tap at the last stage before apps adjusts mouse-wheel notches: `normalizeWheel` makes each notch a whole line, and `shiftScroll` keeps Shift + wheel vertical (AppKit would otherwise turn it horizontal inside the game).
-5. Optionally (`--sync-global`), MGL also restores macOS's *global* modifier state with a synthetic modifier event, for apps/addons that query the current modifier state instead of reading it from the event.
+> ⚠️ **Known issue:** `Shift` + **mouse wheel** bindings (`SHIFT-MOUSEWHEELUP/DOWN`) still do not work in WoW — macOS turns Shift + wheel into horizontal scrolling inside the game. Details and workarounds in [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md#1-shift--mouse-wheel-does-not-trigger-wow-bindings-shift-mousewheelup--shift-mousewheeldown).
 
-Profiles in a JSON config decide **when** MGL is active (e.g. only while World of Warcraft is in the foreground) and **how** (which modifiers, mouse patching, global sync).
+> Status: **alpha (v0.1.0)** · [Roadmap](docs/ROADMAP.md) · [Changelog](CHANGELOG.md) · [TODO](TODO.md) · [Dev log](DEV_LOG.txt)
+
+## Why it happens
+
+A mouse with programmable side buttons that send keys shows up on macOS as an **extra keyboard**. macOS keeps modifier state **per device**: a key coming from the "mouse keyboard" carries that device's modifiers — none — even while you hold Shift on your real keyboard. Diagnostics with `mgl-probe` showed that, at that moment, even macOS's *global* modifier state reads "no modifiers". The vendor software for macOS (SteelSeries GG) offers no workaround.
+
+## How MGL fixes it
+
+1. An event tap watches the **real keyboard** and keeps track of which modifiers you are holding (MGL keeps its own state, because the system one is reset by the mouse).
+2. Every key press that arrives **without** those modifiers — i.e. from the mouse — gets them added. Mouse clicks and scroll events are patched the same way.
+3. The game sees `Shift+1`, `Alt+1`, `Ctrl+1`, …
+4. A second tap, right before events reach the game, fixes mouse-wheel notches (`normalizeWheel`: one notch = one step; experimental `shiftScroll`).
+5. Optional (`--sync-global`): also restores macOS's *global* modifier state, for software that queries it instead of reading the event.
+
+It is a strict **1:1 remap** — one physical press, one keystroke — with no macros, no timing, no automation, and no access to game memory or files.
+
+Profiles in a JSON config decide **when** MGL is active (e.g. only while World of Warcraft is in front) and **how** (which modifiers, mouse patching, wheel options).
 
 ## Requirements
 
 - macOS 13+ on Apple Silicon (developed on MacBook Pro M1 Pro)
 - Swift 5.9+ toolchain — Command Line Tools are enough for everything, including the app bundle (no Xcode needed)
 - Permissions: **Accessibility** and **Input Monitoring** (System Settings → Privacy & Security)
-
-## Project layout
-
-```
-MGL_mouse_gaming_layer/
-├── Package.swift
-├── Sources/
-│   ├── MGLCore/        # engine, event tap, config/profiles, HID tools, key & modifier tables
-│   ├── mgl-probe/      # diagnostic CLI: lists HID devices, logs raw events
-│   ├── mgl/            # the layer as a CLI (debugging, verbose logs)
-│   └── MGLMenuBar/     # the menu-bar app (MGL.app)
-├── Tests/MGLCoreTests/
-├── config/example.json
-├── Resources/AppIcon.icns
-├── scripts/            # test.sh, build-app.sh, create-signing-identity.sh, uninstall.sh, make-icon.swift
-├── .github/workflows/  # CI
-├── docs/ROADMAP.md, docs/KNOWN_ISSUES.md
-├── CHANGELOG.md, TODO.md, LICENSE
-├── DEV_LOG.txt
-└── README.md
-```
 
 ## Menu-bar app (recommended)
 
@@ -160,6 +158,27 @@ World of Warcraft and Blizzard Entertainment are trademarks or registered tradem
 ./scripts/uninstall.sh --dry-run   # show what would be removed
 ./scripts/uninstall.sh             # MGL.app + Launch at Login, stops running MGL/mgl
 ./scripts/uninstall.sh --all       # also config, preferences, signing identity, Accessibility entry
+```
+
+## Project layout
+
+```
+MGL_mouse_gaming_layer/
+├── Package.swift
+├── Sources/
+│   ├── MGLCore/        # engine, event tap, config/profiles, HID tools, key & modifier tables
+│   ├── mgl-probe/      # diagnostic CLI: lists HID devices, logs raw events
+│   ├── mgl/            # the layer as a CLI (debugging, verbose logs)
+│   └── MGLMenuBar/     # the menu-bar app (MGL.app)
+├── Tests/MGLCoreTests/
+├── config/example.json
+├── Resources/AppIcon.icns
+├── scripts/            # test.sh, build-app.sh, create-signing-identity.sh, uninstall.sh, make-icon.swift
+├── .github/workflows/  # CI
+├── docs/ROADMAP.md, docs/KNOWN_ISSUES.md
+├── CHANGELOG.md, TODO.md, LICENSE
+├── DEV_LOG.txt
+└── README.md
 ```
 
 ## Development

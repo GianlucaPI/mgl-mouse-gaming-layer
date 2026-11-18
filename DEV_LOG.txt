@@ -459,3 +459,16 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     Apple/macOS; descriptive use only; not affiliated/endorsed) sections.
   - Tag v0.1.0 moved to this commit (not pushed yet) so the release includes
     the disclaimer.
+
+[2026-11-18] README: problem-first introduction
+  - User feedback: at first glance the README did not make clear which
+    problem MGL solves.
+  - New opening: one-sentence problem statement; "Is this your problem?"
+    checklist (Mac + side buttons mapped to keyboard keys + Shift/Alt/Ctrl +
+    side button not working); before/after table (Shift+1, Alt+2, Shift-click
+    after a side button, single wheel notch); "Verified with" note (Aerox 9
+    over Bluetooth only; other MMO mice / 2.4 GHz dongle untested, reports
+    welcome); known-issue banner; status links. Then "Why it happens" and
+    "How MGL fixes it" in plain language (technical details kept short).
+  - Project layout section moved down next to Development.
+  - Tag v0.1.0 moved to this commit (still unpushed).
