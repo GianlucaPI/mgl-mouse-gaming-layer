@@ -43,13 +43,23 @@ It is a strict **1:1 remap** — one physical press, one keystroke — with no m
 
 Profiles in a JSON config decide **when** MGL is active (e.g. only while World of Warcraft is in front) and **how** (which modifiers, mouse patching, wheel options).
 
-## Requirements
+## Install
 
-- macOS 13+ on Apple Silicon (developed on MacBook Pro M1 Pro)
-- Swift 5.9+ toolchain — Command Line Tools are enough for everything, including the app bundle (no Xcode needed)
-- Permissions: **Accessibility** and **Input Monitoring** (System Settings → Privacy & Security)
+1. Download **`MGL-<version>.dmg`** from the [Releases](../../releases) page.
+2. Open it and drag **MGL** onto **Applications**.
+3. Open MGL from Applications. MGL is free and open source but **not notarized by Apple** (that requires a paid developer account), so the first time macOS blocks it:
+   **System Settings → Privacy & Security →** scroll down → **Open Anyway** next to MGL → confirm.
+   *(Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/MGL.app`.)*
+4. Grant **Accessibility** when asked (**System Settings → Privacy & Security → Accessibility →** enable MGL). MGL starts by itself as soon as it is granted.
+5. A mouse icon appears in the menu bar. Without a config MGL is active in every app; use **Edit Config…** to limit it to your game (see [Configuration](#configuration)).
 
-## Menu-bar app (recommended)
+Requirements: **macOS 13 or later**, Apple Silicon or Intel (universal app; tested on Apple Silicon only).
+
+Prefer to build it yourself? See [Build from source](#build-from-source).
+
+## Build from source
+
+Needs the Swift 5.9+ toolchain — the Command Line Tools are enough (`xcode-select --install`), no Xcode required.
 
 ```bash
 ./scripts/create-signing-identity.sh   # once: local self-signed code-signing certificate
@@ -173,7 +183,8 @@ MGL_mouse_gaming_layer/
 ├── Tests/MGLCoreTests/
 ├── config/example.json
 ├── Resources/AppIcon.icns
-├── scripts/            # test.sh, build-app.sh, create-signing-identity.sh, uninstall.sh, make-icon.swift
+├── scripts/            # test.sh, build-app.sh, make-dmg.sh, create-signing-identity.sh,
+│                       #   ci-import-identity.sh, uninstall.sh, make-icon.swift
 ├── .github/workflows/  # CI
 ├── docs/ROADMAP.md, docs/KNOWN_ISSUES.md
 ├── CHANGELOG.md, TODO.md, LICENSE
@@ -183,7 +194,8 @@ MGL_mouse_gaming_layer/
 
 ## Development
 
-- CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)): release build, unit tests, CLI smoke tests, ad-hoc signed `MGL.app` uploaded as a build artifact, uninstall dry run.
+- CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)): release build, unit tests, CLI smoke tests, universal ad-hoc signed DMG uploaded as a build artifact, uninstall dry run.
+- Releases ([.github/workflows/release.yml](.github/workflows/release.yml)): pushing a `v*` tag publishes the DMG on GitHub Releases — see [docs/RELEASING.md](docs/RELEASING.md).
 - Changes per version: [CHANGELOG.md](CHANGELOG.md) · planned work: [TODO.md](TODO.md) · open bugs: [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) · step-by-step history: [DEV_LOG.txt](DEV_LOG.txt).
 - App icon: `swift scripts/make-icon.swift` regenerates `Resources/AppIcon.icns`.
 

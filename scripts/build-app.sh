@@ -3,6 +3,7 @@
 #
 #   ./scripts/build-app.sh            build + sign
 #   ./scripts/build-app.sh --install  also copy to /Applications (or ~/Applications) and relaunch
+#   ./scripts/build-app.sh --universal  build for Apple Silicon + Intel (used for releases)
 #
 # Signing identity, in order: $MGL_SIGN_IDENTITY, "MGL Local Code Signing" (see
 # scripts/create-signing-identity.sh), otherwise ad-hoc. With ad-hoc signing macOS
@@ -11,10 +12,12 @@ set -eu
 cd "$(dirname "$0")/.."
 
 INSTALL=0
+ARCH_ARGS=""
 for arg in "$@"; do
   case "$arg" in
     --install) INSTALL=1 ;;
-    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+    --universal) ARCH_ARGS="--arch arm64 --arch x86_64" ;;
+    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -28,13 +31,15 @@ APP="build/$APP_NAME.app"
 
 # Build every product (app + mgl + mgl-probe) so the CLI tools in .build/release
 # always match the installed app.
-echo "==> Building all products (release)"
+echo "==> Building all products (release${ARCH_ARGS:+, universal})"
 BUILD_LOG="$(mktemp)"
-if ! swift build -c release >"$BUILD_LOG" 2>&1; then
+# shellcheck disable=SC2086  # ARCH_ARGS is intentionally word-split
+if ! swift build -c release $ARCH_ARGS >"$BUILD_LOG" 2>&1; then
   grep -v "search path" "$BUILD_LOG" >&2; rm -f "$BUILD_LOG"; exit 1
 fi
 grep -v "search path" "$BUILD_LOG" | tail -1; rm -f "$BUILD_LOG"
-BIN_DIR="$(swift build -c release --show-bin-path)"
+# shellcheck disable=SC2086
+BIN_DIR="$(swift build -c release $ARCH_ARGS --show-bin-path)"
 BIN="$BIN_DIR/MGLMenuBar"
 [ -x "$BIN" ] || { echo "Build failed: $BIN not found" >&2; exit 1; }
 
@@ -81,7 +86,7 @@ codesign --force --sign "$IDENTITY" --identifier "$BUNDLE_ID" --timestamp=none "
 codesign --verify --strict "$APP"
 echo "    $(codesign -dr - "$APP" 2>&1 | grep designated)"
 
-echo "==> Built $APP ($SHORT_VERSION build $BUILD_NUMBER)"
+echo "==> Built $APP ($SHORT_VERSION build $BUILD_NUMBER, $(lipo -archs "$APP/Contents/MacOS/$APP_NAME"))"
 echo "    CLI tools: $BIN_DIR/mgl, $BIN_DIR/mgl-probe"
 
 if [ "$INSTALL" = 1 ]; then

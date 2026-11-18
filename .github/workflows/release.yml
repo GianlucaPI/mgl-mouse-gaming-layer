@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write   # create the GitHub Release
+
+jobs:
+  release:
+    name: Build DMG and publish release
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # build number = commit count
+
+      - name: Check tag matches MGL.version
+        run: |
+          VERSION="$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' Sources/MGLCore/MGL.swift)"
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match MGL.version $VERSION"; exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Unit tests
+        run: ./scripts/test.sh
+
+      - name: Signing identity (optional, from secrets)
+        env:
+          MGL_SIGNING_P12_BASE64: ${{ secrets.MGL_SIGNING_P12_BASE64 }}
+          MGL_SIGNING_P12_PASSWORD: ${{ secrets.MGL_SIGNING_P12_PASSWORD }}
+        run: |
+          IDENTITY="$(./scripts/ci-import-identity.sh)"
+          echo "MGL_SIGN_IDENTITY=${IDENTITY:--}" >> "$GITHUB_ENV"
+
+      - name: Build universal MGL.app
+        run: ./scripts/build-app.sh --universal
+
+      - name: Build DMG
+        run: ./scripts/make-dmg.sh
+
+      - name: Release notes from CHANGELOG
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on && /^\[[^]]+\]: / { next }
+            on { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          cat >> "$RUNNER_TEMP/notes.md" <<'TXT'
+
+          ### Install
+          Download `MGL-*.dmg`, open it and drag **MGL** into **Applications**.
+          MGL is **not notarized**: the first time, open it via *System Settings → Privacy & Security → Open Anyway*, then grant **Accessibility**. Full steps in the README (Install section).
+          TXT
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "build/MGL-$VERSION.dmg" "build/MGL-$VERSION.dmg.sha256" \
+            --title "MGL $VERSION" --notes-file "$RUNNER_TEMP/notes.md"

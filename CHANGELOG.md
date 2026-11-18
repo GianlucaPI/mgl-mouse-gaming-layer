@@ -14,6 +14,7 @@ First release. Verified on a MacBook Pro M1 Pro with a SteelSeries Aerox 9 (Blue
 - **Menu-bar app** `MGL.app`: status icon, pause, profile override, config editing, Launch at Login, permission handling.
 - **CLI** `mgl` (same engine, verbose logs) and **diagnostics** `mgl-probe` (`list`, `perms`, `apps`, `hid`, `tap`, `watch`, `appkit`).
 - Scripts: `build-app.sh` (no Xcode needed), `create-signing-identity.sh` (stable signature so Accessibility survives rebuilds), `uninstall.sh`, `make-icon.swift`, `test.sh`.
+- **Downloadable DMG** (`MGL-<version>.dmg`, drag to Applications, first-launch guide) built and published automatically on GitHub Releases for every `v*` tag; universal app (Apple Silicon + Intel). Not notarized: first launch needs *Open Anyway*.
 - CI on GitHub Actions, MIT license, app icon.
 
 ### Known issues

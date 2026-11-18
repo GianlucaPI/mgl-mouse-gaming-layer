@@ -17,6 +17,13 @@ Items agreed but not implemented yet. Details and history in [DEV_LOG.txt](DEV_L
 
 - [ ] **Warn when two layers run at once** (MGL.app + a CLI `mgl`, or two apps): both patch events. Detect another instance (e.g. `NSRunningApplication` / a lock file) and warn in the menu / CLI.
 
+## Distribution
+
+- [ ] **Notarization** (needs the paid Apple Developer Program, 99 $/year): Developer ID Application certificate, `codesign --options runtime`, `xcrun notarytool submit --wait` + `stapler staple` for app and DMG, in the release workflow. Removes the Gatekeeper "Open Anyway" step. See [docs/RELEASING.md](docs/RELEASING.md).
+- [ ] **Homebrew cask** (own tap first; the official one increasingly expects notarized apps).
+- [ ] **Auto-updates** with Sparkle (EdDSA update key, appcast published with each release).
+- [ ] Optional: switch DMG creation from `hdiutil` (deprecated on macOS 27) to `diskutil image` once CI runners have it.
+
 ## Low priority / housekeeping
 
 - [ ] Per-button remap (side button → F13…F24) — needs a freshly synthesized key event, not just a keycode change (ROADMAP Phase 4, deferred).

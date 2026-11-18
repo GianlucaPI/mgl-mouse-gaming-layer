@@ -472,3 +472,33 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     "How MGL fixes it" in plain language (technical details kept short).
   - Project layout section moved down next to Development.
   - Tag v0.1.0 moved to this commit (still unpushed).
+
+[2026-11-18] Distribution level A: downloadable DMG via GitHub Releases
+  - Q from the user: their other app (AxoNote) installs without notarization.
+    Answer: Gatekeeper only checks quarantined downloads; apps built locally
+    (AxoNote, MGL via build-app.sh) are never quarantined. Any app downloaded
+    from GitHub hits the same "Open Anyway" step unless notarized.
+  - Universal binary works with Command Line Tools only:
+    `swift build -c release --arch arm64 --arch x86_64` -> lipo: x86_64 arm64.
+  - build-app.sh --universal; reports the architectures.
+  - scripts/make-dmg.sh: build/MGL-<version>.dmg (UDZO, HFS+) with MGL.app,
+    /Applications link and "First launch - READ ME.txt" (Open Anyway / xattr,
+    Accessibility, menu icon) + .sha256. hdiutil prints deprecation warnings
+    on macOS 27 (diskutil image is the successor) but works; kept because
+    macos-15 runners lack the new command (TODO).
+  - .github/workflows/release.yml (on v* tags): checks tag == MGL.version,
+    tests, optional stable signing from secrets (scripts/ci-import-identity.sh
+    imports the .p12 into a temporary keychain; else ad-hoc), universal app,
+    DMG, release notes = CHANGELOG section + install note, `gh release create`.
+  - ci.yml: builds the universal DMG as artifact; no longer runs on tags
+    (release.yml does).
+  - README: new "Install" section (download DMG, drag, Open Anyway, xattr
+    alternative, Accessibility, config); "Menu-bar app" renamed "Build from
+    source". docs/RELEASING.md: release steps, optional signing secrets (with
+    the security caveat), future notarization. CHANGELOG 0.1.0 mentions the
+    DMG. TODO: notarization, Homebrew cask, Sparkle, diskutil.
+  - Verified locally: universal ad-hoc app, DMG built + verified, mounted
+    read-only (contents and signature OK), notes extraction OK, 39 tests.
+    Release workflow itself not run yet (needs the GitHub repo).
+  - Tag v0.1.0 moved to this commit (unpushed): pushing it will publish the
+    first release automatically.
