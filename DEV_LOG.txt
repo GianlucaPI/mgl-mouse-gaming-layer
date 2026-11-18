@@ -502,3 +502,22 @@ Newest entries at the bottom. Format: [YYYY-MM-DD] Phase - summary, then details
     Release workflow itself not run yet (needs the GitHub repo).
   - Tag v0.1.0 moved to this commit (unpushed): pushing it will publish the
     first release automatically.
+
+[2026-11-18] First GitHub release published (v0.1.0)
+  - Repo: github.com/GianlucaPI/mgl-mouse-gaming-layer. User report: nothing
+    under Releases.
+  - Cause (my mistake): the remote tag v0.1.0 pointed to ca26a09 (README
+    disclaimer), pushed before release.yml existed, so no release run. I had
+    later MOVED the tag locally twice; `git push --follow-tags` never updates
+    a tag that already exists on the remote. Rule from now on: never move a
+    tag that may have been pushed — bump the version instead.
+  - Fix (approved by the user): `git push origin v0.1.0 --force` (tag only)
+    -> v0.1.0 = 232fc35. Release workflow run 44286167153: success in 1m32s.
+    Release "MGL 0.1.0" (not draft/prerelease) with MGL-0.1.0.dmg (551 KB) and
+    MGL-0.1.0.dmg.sha256. Downloaded and checked: hash matches, DMG contains
+    MGL.app (x86_64 arm64, ad-hoc), Applications link, first-launch guide.
+  - Defect found: the .sha256 file lists "build/MGL-0.1.0.dmg", so
+    `shasum -c` next to the downloaded DMG fails. make-dmg.sh now writes the
+    bare file name (fixes future releases; the 0.1.0 asset still has the path).
+  - Workflows: actions/checkout@v4 -> @v5 (v4 runs on deprecated Node 20,
+    GitHub annotation).

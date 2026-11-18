@@ -42,4 +42,6 @@ rm -f "$DMG"
 hdiutil create -volname "MGL $VERSION" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG" >/dev/null
 hdiutil verify "$DMG" >/dev/null
 echo "==> Built $DMG ($(du -h "$DMG" | cut -f1 | tr -d ' '))"
-shasum -a 256 "$DMG" | tee "$DMG.sha256"
+# Bare file name in the checksum file, so users can run `shasum -a 256 -c MGL-<v>.dmg.sha256`
+# next to the downloaded DMG.
+(cd build && shasum -a 256 "MGL-$VERSION.dmg" | tee "MGL-$VERSION.dmg.sha256")
